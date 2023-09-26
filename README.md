@@ -11,6 +11,8 @@
 - PU平台账号密码或会复制cookies
 - 会用记事本修改.properties配置文件
 
+下载Release中最新的PUSeckill.zip,解压缩
+
 ### 完成网页登录
 
 #### A.或使用账号密码自动登录
@@ -29,7 +31,7 @@
   
   cookies不包含引号 cookies失效期为10小时(Hm_lvt是广告没用)
 
-- 修改配置文件
+- 修改setting.properties配置文件
   
   useLocalCookies=true
   
@@ -43,7 +45,7 @@
 
 - activityID_1为 id后的内容
 
-- 修改配置文件
+- 修改setting.properties配置文件
   
   activityID_1=（活动id）
 
