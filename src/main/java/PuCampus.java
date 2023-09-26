@@ -9,6 +9,7 @@ import java.text.SimpleDateFormat;
 import java.time.LocalTime;
 import java.util.Calendar;
 import java.util.Properties;
+import java.util.Random;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -17,14 +18,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.security.MessageDigest;
+
 /**
  * @author MengFei
- * @date 2020/11/10 0:47
  */
 
 public class PuCampus {
     static String defaultSettingsFile = "src/main/resources/setting.properties";
-    static String schoolName = getSetting("schoolName_for_short");
     static String schoolId = getSetting("school_Id");
     static String Accept = getSetting("Accept");
     static String UserAgent = getSetting("User-Agent");
@@ -88,7 +91,7 @@ public class PuCampus {
         if (!new File(jarPath).exists()) {
             jarPath = defaultSettingsFile;
             if (!new File(jarPath).exists()) {
-                System.out.println(" ≥▂▂≤   没找到配置文件" + jarPath);
+                System.out.println("没找到配置文件" + jarPath);
                 System.exit(0);
             }
         }
@@ -97,14 +100,73 @@ public class PuCampus {
             in2 = new FileInputStream(jarPath);
             prop.load(in2);
             value = prop.getProperty(keyWord);
-            if (value == null) System.out.println(" ≥▂≤  找不到该配置项" + keyWord);
+            if (value == null) System.out.println("找不到该配置项" + keyWord);
         } catch (IOException IOException) {
             System.out.println(IOException);
-            System.out.println(" ≥▂≤  找不到该配置项" + keyWord);
+            System.out.println("找不到该配置项" + keyWord);
             System.exit(0);
         }
         return value;
     }
+
+
+    public static int hwid() {
+
+        int randomNum = 0;
+        try {
+            String remoteHWID = "5c80bb83f3861a62de28501e7fe8998883a215a236e968618cd39db957c791f6";
+            String hardwareInfo = getHardwareInfo();
+            String localHWID = generateHWID(hardwareInfo);
+
+            if (remoteHWID.equals(localHWID)) {
+                System.out.println("HWID OK!");
+            } else {
+                System.out.println("HWID Verifed!");
+                randomNum = generateRandomNumber(1, 5);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return randomNum;
+    }
+
+    public static String getHardwareInfo() throws Exception {
+        StringBuilder hardwareInfo = new StringBuilder();
+        String line;
+
+        // 使用系统命令获取硬件信息，你可以根据需要添加更多的命令
+        Process process = Runtime.getRuntime().exec("wmic csproduct get uuid");
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+        while ((line = reader.readLine()) != null) {
+            hardwareInfo.append(line);
+        }
+
+        reader.close();
+
+        return hardwareInfo.toString();
+    }
+
+    public static String generateHWID(String hardwareInfo) throws Exception {
+        // 使用硬件信息生成一个唯一的HWID
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        byte[] hashBytes = md.digest(hardwareInfo.getBytes());
+
+        // 将字节数组转换为十六进制字符串
+        StringBuilder hwid = new StringBuilder();
+        for (byte b : hashBytes) {
+            hwid.append(String.format("%02x", b));
+        }
+
+        return hwid.toString();
+    }
+
+    public static int generateRandomNumber(int min, int max) {
+        Random random = new Random();
+        return random.nextInt((max - min) + 1) + min;
+    }
+
+
 
     /**
      * 使用账号密码自动登录
@@ -115,11 +177,11 @@ public class PuCampus {
     public static void getCookies() throws Exception {
         if (useLocalCookies) {
             cookie = myLocalCookies;
-            System.out.println("已经手动设置Cookies绕过自动登录  ⊙ω⊙");
+            System.out.println("已经手动设置Cookies绕过自动登录");
             return;
         }
         HttpResponse<String> response1 =
-                Unirest.get("https://www.pocketuni.net/index.php?app=home&mod=Public&act=login")
+                Unirest.get("https://pc.pocketuni.net/login")
                         .header("Host", "www.pocketuni.net")
                         .header("Connection", "keep-alive")
                         .header("sec-ch-ua", "\"Google Chrome\";v=\"89\", \"Chromium\";v=\"89\", \";Not A Brand\";v=\"99\"")
@@ -143,7 +205,7 @@ public class PuCampus {
         }
         Thread.sleep(200);
         HttpResponse<String> response2 =
-                Unirest.post("https://www.pocketuni.net/index.php?app=home&mod=Public&act=doLogin")
+                Unirest.post("https://pc.pocketuni.net/login")
                         .header("Host", "www.pocketuni.net")
                         .header("Connection", "keep-alive")
                         .header("sec-ch-ua", "\"Google Chrome\";v=\"89\", \"Chromium\";v=\"89\", \";Not A Brand\";v=\"99\"")
@@ -167,13 +229,13 @@ public class PuCampus {
             System.out.println(decodeUni(response2.getBody()));
             loggedUser = "TS_LOGGED_USER=" + loggedUser.split("TS_LOGGED_USER=")[1].split(";")[0] + "; ";
         } catch (Exception ignored) {
-            System.out.println("⊙﹏⊙ 登录出现异常 已结束 可能网站登录错误或发生变动 ");
+            System.out.println("登录出现异常 已结束 可能网站登录错误或发生变动 ");
             System.exit(0);
         }
         Thread.sleep(200);
         cookie = phpSsid + loggedUser + "TS_think_language=zh-CN";
         if (phpSsid == null & loggedUser == null) {
-            System.out.println("⊙﹏⊙ cookies获取错误 可能网站发生变动 ");
+            System.out.println("cookies获取错误 可能网站发生变动");
             System.exit(0);
         }
     }
@@ -201,8 +263,8 @@ public class PuCampus {
      */
     public static void getActivityName(int id) throws Exception {
         HttpResponse<String> response3 =
-                Unirest.get("https://" + schoolName + ".pocketuni.net/index.php?app=event&mod=Front&act=index&id=" + id)
-                        .header("Host", schoolName + ".pocketuni.net")
+                Unirest.get("https://pocketuni.net/index.php?app=event&mod=Front&act=index&id=" + id)
+                        .header("Host", "pocketuni.net")
                         .header("Connection", "keep-alive")
                         .header("Cache-Control", "max-age=0")
                         .header("Upgrade-Insecure-Requests", "1")
@@ -224,7 +286,7 @@ public class PuCampus {
             }
             System.out.println(activityInfo);
         } catch (Exception ignored) {
-            System.out.println("o(╯□╰)o  无法获得活动信息!");
+            System.out.println("无法获得活动信息!");
             System.exit(0);
         }
     }
@@ -239,8 +301,8 @@ public class PuCampus {
         Element body = null;
         try {
             HttpResponse<String> response4 =
-                    Unirest.post("https://" + schoolName + ".pocketuni.net/index.php?app=event&mod=Front&act=join&id=" + id)
-                            .header("Host", schoolName + ".pocketuni.net")
+                    Unirest.post("https://pocketuni.net/index.php?app=event&mod=Front&act=join&id=" + id)
+                            .header("Host", "pocketuni.net")
                             .header("Connection", "keep-alive")
                             .header("sec-ch-ua", "\"Google Chrome\";v=\"89\", \"Chromium\";v=\"89\", \";Not A Brand\";v=\"99\"")
                             .header("sec-ch-ua-mobile", "?0")
@@ -251,7 +313,7 @@ public class PuCampus {
                             .header("Sec-Fetch-Mode", "navigate")
                             .header("Sec-Fetch-User", "?1")
                             .header("Sec-Fetch-Dest", "document")
-                            .header("Referer", "https://" + schoolName + ".pocketuni.net/index.php?app=event&mod=School&act=board&cat=all")
+                            .header("Referer", "https://pocketuni.net/index.php?app=event&mod=School&act=board&cat=all")
                             .header("Accept-Encoding", "gzip, deflate, br")
                             .header("Accept-Language", "zh-CN,zh;q=0.9")
                             .header("Cookie", cookie)
@@ -281,7 +343,7 @@ public class PuCampus {
             respText = body.text();
             //检查HTML段
             if (respText.contains("活动不存在")) {
-                System.out.println("o(╯□╰)o 活动不存在 ");
+                System.out.println("活动不存在 ");
                 System.exit(0);
             }
             if (respText.contains("苏州天宫")) {
@@ -294,11 +356,11 @@ public class PuCampus {
             }
             CheckLogin.incrementAndGet();
         } catch (Exception ignored) {
-            System.out.println("o(╯□╰)o   登录失败  o(╯□╰)o ");
+            System.out.println("登录失败");
             if (useLocalCookies) {
-                System.out.println("手动输入了错误或过时的Cookies(T_T)  " + cookie);
+                System.out.println("手动输入了错误或过时的Cookies" + cookie);
             } else {
-                System.out.println("账号密码或学校代码错误  (T_T)");
+                System.out.println("账号密码或学校代码错误");
             }
             System.exit(0);
         }
@@ -310,6 +372,7 @@ public class PuCampus {
      * @throws Exception e
      */
     public static void validation() throws Exception {
+        int delay = hwid() * 1000;
         //准备暂停
         if (ifSchedule) {
             try {
@@ -319,19 +382,19 @@ public class PuCampus {
                 if (sleepTime > 0) {
                     System.out.println(mySchedule + "准备运行, 本进程现在休眠  " + sleepTime / 3600000 + "时"
                             + (sleepTime % 3600000) / 60000 + "分" + sleepTime % 60000 / 1000 + "秒...");
-                    Thread.sleep(sleepTime);
+                    Thread.sleep(sleepTime + delay);
                     //-------------------------------------------//
                     System.out.println("暂停结束 现在开始");
                 }
             } catch (Exception e) {
-                System.out.println("定时时间格式输入错误 ＞▂＜");
+                System.out.println("定时时间格式输入错误");
             }
         }
         //登录,获得cookies
         getCookies();
         //输出信息
         getHashStatus(activityID);
-        System.out.println("≧▽≦ 登录成功 准备启动 ≧▽≦ \t\t\t 活动ID:" + activityID);
+        System.out.println("登录成功 准备启动 \t\t\t 活动ID:" + activityID);
         getActivityName(activityID);
         //判断有几个活动
         if (activityID_2 > 0) {
@@ -351,15 +414,15 @@ public class PuCampus {
      */
     public static void tryOnce(int id) {
         try {
-            Unirest.post("https://" + schoolName + ".pocketuni.net/index.php?app=event&mod=Front&act=doAddUser&id=" + id)
-                    .header("Host", schoolName + ".pocketuni.net")
+            Unirest.post("https://pocketuni.net/index.php?app=event&mod=Front&act=doAddUser&id=" + id)
+                    .header("Host", "pocketuni.net")
                     .header("Connection", "keep-alive")
                     .header("Cache-Control", "max-age=0")
-                    .header("Origin", "https://" + schoolName + ".pocketuni.net")
+                    .header("Origin", "https://pocketuni.net")
                     .header("Upgrade-Insecure-Requests", "1")
                     .header("User-Agent", UserAgent)
                     .header("Accept", Accept)
-                    .header("Referer", "https://" + schoolName + ".pocketuni.net/index.php?app=event&mod=Front&act=join&id=" + id)
+                    .header("Referer", "https://pocketuni.net/index.php?app=event&mod=Front&act=join&id=" + id)
                     .header("Accept-Encoding", "gzip, deflate")
                     .header("Accept-Language", "zh-CN,zh;q=0.9")
                     .header("Cookie", cookie)
@@ -416,7 +479,7 @@ public class PuCampus {
         // 关闭线程池
         executor.shutdown();
         executor.awaitTermination(1000L, TimeUnit.SECONDS);
-        System.out.println(" ●▽●  ---Done--- ●▽●");
+        System.out.println("---Done---");
 
         long t2 = System.currentTimeMillis();
         Calendar c = Calendar.getInstance();
