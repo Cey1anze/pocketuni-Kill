@@ -1,3 +1,5 @@
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
@@ -5,11 +7,11 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.time.LocalTime;
-import java.util.Calendar;
-import java.util.Properties;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -110,19 +112,59 @@ public class PuCampus {
     }
 
 
+    public static List<String> extractHwidValuesFromURL(String url) {
+        List<String> hwidList = new ArrayList<>();
+
+        try {
+            URL apiUrl = new URL(url);
+
+            HttpURLConnection connection = (HttpURLConnection) apiUrl.openConnection();
+            connection.setRequestMethod("GET");
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            StringBuilder response = new StringBuilder();
+            String line;
+
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
+            }
+
+            reader.close();
+            connection.disconnect();
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode root = objectMapper.readTree(response.toString());
+
+            if (root.isArray()) {
+                for (JsonNode node : root) {
+                    JsonNode hwidNode = node.get("hwid");
+                    if (hwidNode != null && hwidNode.isTextual()) {
+                        String hwid = hwidNode.asText();
+                        hwidList.add(hwid);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println("HWIDList Verified!");
+        return hwidList;
+    }
+
     public static int hwid() {
 
         int randomNum = 0;
+        String jsonUrl = "https://raw.githubusercontent.com/Cey1anze/pocketuni-Kill/master/src/main/resources/hwidlist.json";
+        List<String> hwidList = extractHwidValuesFromURL(jsonUrl);
         try {
-            String remoteHWID = "5c80bb83f3861a62de28501e7fe8998883a215a236e968618cd39db957c791f6";
             String hardwareInfo = getHardwareInfo();
             String localHWID = generateHWID(hardwareInfo);
 
-            if (remoteHWID.equals(localHWID)) {
+            if (hwidList.contains(localHWID)) {
                 System.out.println("HWID OK!");
             } else {
-                System.out.println("HWID Verifed!");
-                randomNum = generateRandomNumber(1, 5);
+                System.out.println("HWID Verified!");
+                randomNum = generateRandomNumber(500, 1500);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -134,7 +176,6 @@ public class PuCampus {
         StringBuilder hardwareInfo = new StringBuilder();
         String line;
 
-        // 使用系统命令获取硬件信息，你可以根据需要添加更多的命令
         Process process = Runtime.getRuntime().exec("wmic csproduct get uuid");
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
@@ -148,11 +189,9 @@ public class PuCampus {
     }
 
     public static String generateHWID(String hardwareInfo) throws Exception {
-        // 使用硬件信息生成一个唯一的HWID
         MessageDigest md = MessageDigest.getInstance("SHA-256");
         byte[] hashBytes = md.digest(hardwareInfo.getBytes());
 
-        // 将字节数组转换为十六进制字符串
         StringBuilder hwid = new StringBuilder();
         for (byte b : hashBytes) {
             hwid.append(String.format("%02x", b));
@@ -372,7 +411,7 @@ public class PuCampus {
      * @throws Exception e
      */
     public static void validation() throws Exception {
-        int delay = hwid() * 1000;
+        int delay = hwid();
         //准备暂停
         if (ifSchedule) {
             try {

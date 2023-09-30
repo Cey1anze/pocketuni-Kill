@@ -8,10 +8,11 @@
 
 - 电脑端浏览器(Edge Chrome Firefox)
 - JDK1.8+
-- PU平台账号密码或会复制cookies
+- 记得PU平台账号密码或会复制cookies
 - 会用记事本修改.properties配置文件
+- github能够正常访问（程序需要连接github读取网络配置）
 
-下载Release中最新的PUSeckill.zip,解压缩
+下载Release中最新的PUSeckill.zip, 解压缩
 
 ### 完成网页登录
 
