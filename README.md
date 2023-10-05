@@ -20,11 +20,9 @@
 
 - 修改setting.properties配置文件
   
+  activityID_1=（活动ID，获取方式见下）
+  
   mySchedule=（严格按照格式）
-  
-  Student_ID=（学号即可，不要选择输入账号）
-  
-  Password=（必须正确，记不住的先重置一次密码）
 
 #### B.或复制浏览器的cookies
 
@@ -40,11 +38,11 @@
 
 ### 获得活动编号
 
-- 点入要参加的活动
+- 点入要参加的活动，电脑端查看地址栏内容，手机端分享活动到其他地方（QQ,微信），会生成分享连接
   
   > https://pc.pocketuni.net/active/detail?id=xxxxx
 
-- activityID_1为 id后的内容
+- 复制id值
 
 - 修改setting.properties配置文件
   
@@ -52,7 +50,11 @@
 
 ### 快速启动
 
-配置好setting.properties文件后直接双击run.bat启动程序，程序会全程自动运行，无需任何人为干预，运行期间不要关闭运行窗口
+配置好setting.properties文件后直接双击run.bat启动程序，程序启动后会在运行当前目录生成一个二维码图片 **`output.png`** ，并要求你进行二维码登陆，请使用手机版PU口袋校园扫一扫，扫码时间设定为 **15秒** ，请在15秒内 **扫描二维码并确认登陆** ！！登陆完成后程序会全程自动运行，无需任何人为干预，运行期间不要关闭运行窗口
+
+![](https://cdn.jsdelivr.net/gh/Cey1anze/Blog_Images@main/pic/202310052210894.png)
+
+![](https://cdn.jsdelivr.net/gh/Cey1anze/Blog_Images@main/pic/202310052211102.png)
 
 ### 提示
 
