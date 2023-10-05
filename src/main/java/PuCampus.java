@@ -300,7 +300,6 @@ public class PuCampus {
         QRTime();
         HttpResponse<String> response2 = Unirest.post("https://pocketuni.net/index.php?app=api&mod=Sitelist&act=pollingLogin&0")
                 .header("Host", "pocketuni.net")
-                .header("Cookie", "PHPSESSID=5ec51a93651eab2850955; TS_think_language=zh-CN")
                 .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0")
                 .header("Accept", "application/json, text/plain, */*")
                 .header("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2")
