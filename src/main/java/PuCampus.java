@@ -24,19 +24,18 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.security.MessageDigest;
 
-/**
- * @author MengFei
- */
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.util.Base64;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 
 public class PuCampus {
     static String defaultSettingsFile = "src/main/resources/setting.properties";
-    static String schoolId = getSetting("school_Id");
     static String Accept = getSetting("Accept");
     static String UserAgent = getSetting("User-Agent");
-    static String remarkName = getSetting("remarkName");
     static String mySchedule = getSetting("mySchedule");
-    static String xueHao = getSetting("Student_ID");
-    static String password = getSetting("Password");
     static String myLocalCookies = getSetting("myCookies");
     static int activityID = Integer.parseInt(getSetting("activityID_1"));
     static int activityID_2 = Integer.parseInt(getSetting("activityID_2"));
@@ -120,6 +119,8 @@ public class PuCampus {
 
             HttpURLConnection connection = (HttpURLConnection) apiUrl.openConnection();
             connection.setRequestMethod("GET");
+            int timeout = 10000; // 5秒
+            connection.setConnectTimeout(timeout);
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
             StringBuilder response = new StringBuilder();
@@ -146,6 +147,8 @@ public class PuCampus {
             }
         } catch (IOException e) {
             e.printStackTrace();
+            System.out.println("连接超时");
+            System.exit(0);
         }
         System.out.println("HWIDList Verified!");
         return hwidList;
@@ -205,7 +208,40 @@ public class PuCampus {
         return random.nextInt((max - min) + 1) + min;
     }
 
+    /**
+     * 扫码登陆，二维码文件保存在运行目录
+     * 获取cookie
+     */
+    public static void QRTime() {
+        int sleepTime = 15; // 睡眠时间（秒）
 
+        try {
+            for (int i = sleepTime; i > 0; i--) {
+                System.out.println("剩余扫码登陆时间：" + i + " 秒");
+                Thread.sleep(1000); // 暂停1秒钟
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        System.out.println("扫码登陆结束，进程开始！");
+    }
+
+    /**
+     * 解析cookie内容
+     */
+    private static String extractCookieValue(String cookieHeader, String cookieName) {
+        if (cookieHeader != null) {
+            String regex = cookieName + "=([^;]+)";
+            Pattern pattern = Pattern.compile(regex);
+            Matcher matcher = pattern.matcher(cookieHeader);
+
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        }
+        return null;
+    }
 
     /**
      * 使用账号密码自动登录
@@ -219,54 +255,95 @@ public class PuCampus {
             System.out.println("已经手动设置Cookies绕过自动登录");
             return;
         }
-        HttpResponse<String> response1 =
-                Unirest.get("https://pc.pocketuni.net/login")
-                        .header("Host", "www.pocketuni.net")
-                        .header("Connection", "keep-alive")
-                        .header("sec-ch-ua", "\"Google Chrome\";v=\"89\", \"Chromium\";v=\"89\", \";Not A Brand\";v=\"99\"")
-                        .header("sec-ch-ua-mobile", "?0")
-                        .header("Upgrade-Insecure-Requests", "1")
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36")
-                        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9")
-                        .header("Sec-Fetch-Site", "none")
-                        .header("Sec-Fetch-Mode", "navigate")
-                        .header("Sec-Fetch-User", "?1")
-                        .header("Sec-Fetch-Dest", "document")
-                        .header("Accept-Encoding", "gzip, deflate, br")
-                        .header("Accept-Language", "zh-CN,zh;q=0.9")
-                        .asString();
-        try {
-            phpSsid = response1.getHeaders().toString();
-            phpSsid = "PHPSESSID=" + phpSsid.split("PHPSESSID=")[1].split(";")[0] + "; ";
-        } catch (Exception e) {
-            System.out.println(phpSsid);
-            System.exit(0);
+        HttpResponse<String> response1 = Unirest.post("https://pocketuni.net/index.php?app=api&mod=Sitelist&act=loginQrcode")
+                .header("Host", "pocketuni.net")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0")
+                .header("Accept", "application/json, text/plain, */*")
+                .header("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2")
+                .header("Accept-Encoding", "gzip, deflate")
+                .header("Origin", "https://pc.pocketuni.net")
+                .header("Referer", "https://pc.pocketuni.net/")
+                .header("Sec-Fetch-Dest", "empty")
+                .header("Sec-Fetch-Mode", "cors")
+                .header("Sec-Fetch-Site", "same-site")
+                .header("Te", "trailers")
+                .header("Connection", "close")
+                .asString();
+
+        int status = response1.getStatus();
+        String responseBody = response1.getBody();
+
+        System.out.println("二维码HTTP响应状态码: " + status);
+        System.out.println("二维码HTTP响应内容:");
+        System.out.println(responseBody);
+
+        // 使用Jackson解析JSON响应
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode jsonNode = objectMapper.readTree(responseBody);
+
+        // 提取token
+        String token = jsonNode.path("content").path("token").asText();
+        String dataUrl = jsonNode.path("content").path("dataUrl").asText().replace("\\", "").replace("data:image/png;base64,","");
+        System.out.println("Token值: " + token);
+        System.out.println(dataUrl);
+
+
+        byte[] imageBytes = Base64.getDecoder().decode(dataUrl);
+
+        // 创建BufferedImage对象
+        ByteArrayInputStream bis = new ByteArrayInputStream(imageBytes);
+        BufferedImage bufferedImage = ImageIO.read(bis);
+
+        // 保存图片到运行目录
+        File outputFile = new File("output.png");
+        ImageIO.write(bufferedImage, "png", outputFile);
+        QRTime();
+        HttpResponse<String> response2 = Unirest.post("https://pocketuni.net/index.php?app=api&mod=Sitelist&act=pollingLogin&0")
+                .header("Host", "pocketuni.net")
+                .header("Cookie", "PHPSESSID=5ec51a93651eab2850955; TS_think_language=zh-CN")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0")
+                .header("Accept", "application/json, text/plain, */*")
+                .header("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2")
+                .header("Accept-Encoding", "gzip, deflate")
+                .header("Content-Type", "multipart/form-data; boundary=---------------------------196999009720122279474182198307")
+                .header("Origin", "https://pc.pocketuni.net")
+                .header("Referer", "https://pc.pocketuni.net/")
+                .header("Sec-Fetch-Dest", "empty")
+                .header("Sec-Fetch-Mode", "cors")
+                .header("Sec-Fetch-Site", "same-site")
+                .header("Te", "trailers")
+                .header("Connection", "close")
+                .body("-----------------------------196999009720122279474182198307\r\n" +
+                        "Content-Disposition: form-data; name=\"token\"\r\n\r\n" +
+                        token + "\r\n" +
+                        "-----------------------------196999009720122279474182198307--")
+                .asString();
+
+        int status2 = response2.getStatus();
+        String responseBody2 = response2.getBody();
+
+        System.out.println("登陆界面HTTP响应状态码: " + status2);
+        System.out.println("登陆界面HTTP响应内容:");
+        System.out.println(responseBody2);
+        System.out.println("响应头:");
+        response2.getHeaders().forEach((name, values) -> {
+            System.out.println(name + ": " + values);
+        });
+
+        // 获取Set-Cookie头
+        String setCookieHeader = response2.getHeaders().getFirst("Set-Cookie");
+
+        // 使用正则表达式提取ts_logged_user的值
+        loggedUser = extractCookieValue(setCookieHeader, "TS_LOGGED_USER");
+
+        if (loggedUser != null) {
+            System.out.println("ts_logged_user: " + loggedUser);
+        } else {
+            System.out.println("ts_logged_user not found.");
         }
-        Thread.sleep(200);
-        HttpResponse<String> response2 =
-                Unirest.post("https://pc.pocketuni.net/login")
-                        .header("Host", "www.pocketuni.net")
-                        .header("Connection", "keep-alive")
-                        .header("sec-ch-ua", "\"Google Chrome\";v=\"89\", \"Chromium\";v=\"89\", \";Not A Brand\";v=\"99\"")
-                        .header("Accept", "application/json, text/javascript, */*; q=0.01")
-                        .header("X-Requested-With", "XMLHttpRequest")
-                        .header("sec-ch-ua-mobile", "?0")
-                        .header("User-Agent", UserAgent)
-                        .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-                        .header("Origin", "https://www.pocketuni.net")
-                        .header("Sec-Fetch-Site", "same-origin")
-                        .header("Sec-Fetch-Mode", "cors")
-                        .header("Sec-Fetch-Dest", "empty")
-                        .header("Referer", "https://www.pocketuni.net/index.php?app=home&mod=Public&act=login")
-                        .header("Accept-Encoding", "gzip, deflate, br")
-                        .header("Accept-Language", "zh-CN,zh;q=0.9")
-                        .header("Cookie", "PHPSESSID=" + phpSsid + "; TS_think_language=zh-CN ")
-                        .body("sid=" + schoolId + "&number=" + xueHao + "&password=" + password)
-                        .asString();
-        loggedUser = response2.getHeaders().toString();
         try {
             System.out.println(decodeUni(response2.getBody()));
-            loggedUser = "TS_LOGGED_USER=" + loggedUser.split("TS_LOGGED_USER=")[1].split(";")[0] + "; ";
+            loggedUser = "TS_LOGGED_USER=" + loggedUser + "; ";
         } catch (Exception ignored) {
             System.out.println("登录出现异常 已结束 可能网站登录错误或发生变动 ");
             System.exit(0);
@@ -305,7 +382,7 @@ public class PuCampus {
                 Unirest.get("https://pocketuni.net/index.php?app=event&mod=Front&act=index&id=" + id)
                         .header("Host", "pocketuni.net")
                         .header("Connection", "keep-alive")
-                        .header("Cache-Control", "max-age=0")
+                        .header("Cache-Control", "no-cache")
                         .header("Upgrade-Insecure-Requests", "1")
                         .header("User-Agent", UserAgent)
                         .header("Accept", Accept)
@@ -352,7 +429,7 @@ public class PuCampus {
                             .header("Sec-Fetch-Mode", "navigate")
                             .header("Sec-Fetch-User", "?1")
                             .header("Sec-Fetch-Dest", "document")
-                            .header("Referer", "https://pocketuni.net/index.php?app=event&mod=School&act=board&cat=all")
+                            .header("Referer", "https://pocketuni.net/index.php?app=event&mod=Front&act=board&cat=all")
                             .header("Accept-Encoding", "gzip, deflate, br")
                             .header("Accept-Language", "zh-CN,zh;q=0.9")
                             .header("Cookie", cookie)
@@ -390,7 +467,7 @@ public class PuCampus {
             } else System.out.println(respText);
             hash = body.getElementsByAttributeValue("name", "__hash__").get(0).attr("value");
             StatusStr = body.getElementsByClass("b").text();
-            if (StatusStr.length() != 0) {
+            if (!StatusStr.isEmpty()) {
                 System.out.println(StatusStr);
             }
             CheckLogin.incrementAndGet();
@@ -456,7 +533,7 @@ public class PuCampus {
             Unirest.post("https://pocketuni.net/index.php?app=event&mod=Front&act=doAddUser&id=" + id)
                     .header("Host", "pocketuni.net")
                     .header("Connection", "keep-alive")
-                    .header("Cache-Control", "max-age=0")
+                    .header("Cache-Control", "private")
                     .header("Origin", "https://pocketuni.net")
                     .header("Upgrade-Insecure-Requests", "1")
                     .header("User-Agent", UserAgent)
@@ -472,10 +549,10 @@ public class PuCampus {
     }
 
     public static void main(String[] args) throws Exception {
-        System.out.println("备注名:" + remarkName + "\t\t并发线程数:" + THREAD_POOL_SIZE +
-                "\t\t尝试次数:" + taskMAX + "\t\t学号:" + xueHao +
-                "\t\t密码:" + password.substring(0, password.length() - 4) + "****");
+        System.out.println("并发线程数:" + THREAD_POOL_SIZE +
+                "\t\t尝试次数:" + taskMAX);
         Unirest.setTimeouts(2000, 2000);
+        SslUtils.ignoreSsl();
         validation();
         // 创建线程池，其中任务队列需要结合实际情况设置合理的容量
         ThreadFactory namedThreadFactory = new ThreadFactoryBuilder().build();
