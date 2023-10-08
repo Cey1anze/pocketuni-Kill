@@ -273,9 +273,10 @@ public class PuCampus {
         int status = response1.getStatus();
         String responseBody = response1.getBody();
 
-        System.out.println("二维码HTTP响应状态码: " + status);
-        System.out.println("二维码HTTP响应内容:");
-        System.out.println(responseBody);
+        //debug info
+        //System.out.println("二维码HTTP响应状态码: " + status);
+        //System.out.println("二维码HTTP响应内容:");
+        //System.out.println(responseBody);
 
         // 使用Jackson解析JSON响应
         ObjectMapper objectMapper = new ObjectMapper();
@@ -284,8 +285,8 @@ public class PuCampus {
         // 提取token
         String token = jsonNode.path("content").path("token").asText();
         String dataUrl = jsonNode.path("content").path("dataUrl").asText().replace("\\", "").replace("data:image/png;base64,","");
-        System.out.println("Token值: " + token);
-        System.out.println(dataUrl);
+        //System.out.println("Token值: " + token);
+        //System.out.println(dataUrl);
 
 
         byte[] imageBytes = Base64.getDecoder().decode(dataUrl);
@@ -321,13 +322,14 @@ public class PuCampus {
         int status2 = response2.getStatus();
         String responseBody2 = response2.getBody();
 
-        System.out.println("登陆界面HTTP响应状态码: " + status2);
-        System.out.println("登陆界面HTTP响应内容:");
-        System.out.println(responseBody2);
-        System.out.println("响应头:");
-        response2.getHeaders().forEach((name, values) -> {
-            System.out.println(name + ": " + values);
-        });
+        //debug info
+        //System.out.println("登陆界面HTTP响应状态码: " + status2);
+        //System.out.println("登陆界面HTTP响应内容:");
+        //System.out.println(responseBody2);
+        //System.out.println("响应头:");
+        //response2.getHeaders().forEach((name, values) -> {
+            //System.out.println(name + ": " + values);
+        //});
 
         // 获取Set-Cookie头
         String setCookieHeader = response2.getHeaders().getFirst("Set-Cookie");
@@ -488,6 +490,12 @@ public class PuCampus {
      */
     public static void validation() throws Exception {
         int delay = hwid();
+        //登录,获得cookies
+        getCookies();
+        //输出信息
+        getHashStatus(activityID);
+        System.out.println("登录成功 准备启动 \t\t\t 活动ID:" + activityID);
+        getActivityName(activityID);
         //准备暂停
         if (ifSchedule) {
             try {
@@ -505,12 +513,7 @@ public class PuCampus {
                 System.out.println("定时时间格式输入错误");
             }
         }
-        //登录,获得cookies
-        getCookies();
-        //输出信息
-        getHashStatus(activityID);
-        System.out.println("登录成功 准备启动 \t\t\t 活动ID:" + activityID);
-        getActivityName(activityID);
+
         //判断有几个活动
         if (activityID_2 > 0) {
             Activity2 = true;
