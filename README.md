@@ -4,27 +4,37 @@
 
 *有投诉随时跑路*
 
-### 准备工作
+## 准备工作
+
+**下载Release中最新的PUSeckill.zip, 解压缩**
 
 - 电脑端浏览器(Edge Chrome Firefox)
 - JDK1.8+
-- 记得PU平台账号密码或会复制cookies
-- 会用记事本修改.properties配置文件
-- github能够正常访问（程序需要连接github读取网络配置）
+- PU平台 **扫一扫** 或会复制cookies
+- 会用 **记事本** 修改.properties配置文件
+- **github能够正常访问**（程序需要连接github读取网络配置）
 
-下载Release中最新的PUSeckill.zip, 解压缩
+## 启动前配置
 
-### 完成网页登录
+### 修改配置文件
 
-#### A.或使用账号密码自动登录
+***请完全理解并熟悉以下内容再进行快速启动！！！***
+
+> **A , B方法任选其一，推荐使用A方法**
+
+#### A.使用PU平台扫一扫自动登录
+
+**此方法无需获取cookies，更安全**
 
 - 修改setting.properties配置文件
   
   activityID_1=（活动ID，获取方式见下）
   
+  ifSchedule=（true 为定时抢活动，false为立即抢活动，推荐使用true，并定时到活动报名开始时间）
+  
   mySchedule=（严格按照格式）
 
-#### B.或复制浏览器的cookies
+#### B.使用cookies登录
 
 - 浏览器登录完成->按键盘F12选择Console(控制台)->输入> document.cookie复制
   
@@ -35,8 +45,14 @@
   useLocalCookies=true
   
   myCookies=（复制的cookies）
+  
+  activityID_1=（活动ID，获取方式见下）
+  
+  ifSchedule=（true 为定时抢活动，false为立即抢活动，推荐使用true，并定时到活动报名开始时间）
+  
+  mySchedule=（严格按照格式）
 
-### 获得活动编号
+#### 关于如何获得活动编号
 
 - 点入要参加的活动，电脑端查看地址栏内容，手机端分享活动到其他地方（QQ,微信），会生成分享连接
   
@@ -48,9 +64,9 @@
   
   activityID_1=（活动id）
 
-### 快速启动
+## 快速启动
 
-配置好setting.properties文件后直接双击run.bat启动程序，程序启动后会在运行当前目录生成一个二维码图片 **`output.png`** ，并要求你进行二维码登陆，请使用手机版PU口袋校园扫一扫，扫码时间设定为 **15秒** ，请在15秒内 **扫描二维码并确认登陆** ！！登陆完成后程序会全程自动运行，无需任何人为干预，运行期间不要关闭运行窗口
+配置好 **setting.properties** 文件后直接双击 **run.bat** 启动程序，程序启动后会在当前目录生成一个二维码图片 **`output.png`** ，并要求你进行二维码登陆，请使用手机版PU口袋校园扫一扫，扫码时间设定为 **15秒** ，请在15秒内 **扫描二维码并确认登陆** ！！登陆完成后程序会全程自动运行，无需任何人为干预，运行期间不要关闭运行窗口
 
 ![](https://cdn.jsdelivr.net/gh/Cey1anze/Blog_Images@main/pic/202310052210894.png)
 
