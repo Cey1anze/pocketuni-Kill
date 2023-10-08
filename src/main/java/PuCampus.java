@@ -167,7 +167,7 @@ public class PuCampus {
                 System.out.println("HWID OK!");
             } else {
                 System.out.println("HWID Verified!");
-                randomNum = generateRandomNumber(500, 1500);
+                randomNum = generateRandomNumber(200, 350);
             }
         } catch (Exception e) {
             e.printStackTrace();
