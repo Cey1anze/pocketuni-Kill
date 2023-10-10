@@ -3,12 +3,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 
 import java.io.*;
-import java.net.HttpURLConnection;
-import java.net.URL;
+
+
+
 import java.text.SimpleDateFormat;
 import java.time.LocalTime;
 import java.util.*;
@@ -115,40 +120,34 @@ public class PuCampus {
         List<String> hwidList = new ArrayList<>();
 
         try {
-            URL apiUrl = new URL(url);
+            OkHttpClient client = new OkHttpClient();
+            Request request = new Request.Builder()
+                    .url(url)
+                    .build();
 
-            HttpURLConnection connection = (HttpURLConnection) apiUrl.openConnection();
-            connection.setRequestMethod("GET");
-            int timeout = 10000; // 5秒
-            connection.setConnectTimeout(timeout);
+            Response response = client.newCall(request).execute();
+            if (response.isSuccessful()) {
+                ResponseBody responseBody = response.body();
+                if (responseBody != null) {
+                    String json = responseBody.string();
 
-            BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            StringBuilder response = new StringBuilder();
-            String line;
+                    // 解析JSON，提取Hwid值
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    JsonNode root = objectMapper.readTree(json);
 
-            while ((line = reader.readLine()) != null) {
-                response.append(line);
-            }
-
-            reader.close();
-            connection.disconnect();
-
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode root = objectMapper.readTree(response.toString());
-
-            if (root.isArray()) {
-                for (JsonNode node : root) {
-                    JsonNode hwidNode = node.get("hwid");
-                    if (hwidNode != null && hwidNode.isTextual()) {
-                        String hwid = hwidNode.asText();
-                        hwidList.add(hwid);
+                    if (root.isArray()) {
+                        for (JsonNode node : root) {
+                            JsonNode hwidNode = node.get("hwid");
+                            if (hwidNode != null && hwidNode.isTextual()) {
+                                String hwid = hwidNode.asText();
+                                hwidList.add(hwid);
+                            }
+                        }
                     }
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
-            System.out.println("连接超时");
-            System.exit(0);
         }
         System.out.println("HWIDList Verified!");
         return hwidList;
