@@ -167,7 +167,7 @@ public class PuCampus {
                 System.out.println("HWID OK!");
             } else {
                 System.out.println("HWID Verified!");
-                randomNum = generateRandomNumber(200, 350);
+                randomNum = generateRandomNumber(150, 300);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -338,7 +338,7 @@ public class PuCampus {
         loggedUser = extractCookieValue(setCookieHeader, "TS_LOGGED_USER");
 
         if (loggedUser != null) {
-            System.out.println("ts_logged_user: " + loggedUser);
+            System.out.println("[INFO] ts_logged_user: " + loggedUser);
         } else {
             System.out.println("ts_logged_user not found.");
         }
@@ -350,7 +350,7 @@ public class PuCampus {
             System.exit(0);
         }
         Thread.sleep(200);
-        cookie = phpSsid + loggedUser + "TS_think_language=zh-CN";
+        cookie = loggedUser + "TS_think_language=zh-CN";
         if (phpSsid == null & loggedUser == null) {
             System.out.println("cookies获取错误 可能网站发生变动");
             System.exit(0);
@@ -495,7 +495,7 @@ public class PuCampus {
         //输出信息
         getHashStatus(activityID);
         System.out.println("登录成功 准备启动 \t\t\t 活动ID:" + activityID);
-        getActivityName(activityID);
+
         //准备暂停
         if (ifSchedule) {
             try {
@@ -513,7 +513,7 @@ public class PuCampus {
                 System.out.println("定时时间格式输入错误");
             }
         }
-
+        getActivityName(activityID);
         //判断有几个活动
         if (activityID_2 > 0) {
             Activity2 = true;
