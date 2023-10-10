@@ -157,7 +157,7 @@ public class PuCampus {
     public static int hwid() {
 
         int randomNum = 0;
-        String jsonUrl = "https://raw.githubusercontent.com/Cey1anze/pocketuni-Kill/master/src/main/resources/hwidlist.json";
+        String jsonUrl = "https://gitee.com/wxdxyyds/pocketuni-Kill/raw/master/src/main/resources/hwidlist.json";
         List<String> hwidList = extractHwidValuesFromURL(jsonUrl);
         try {
             String hardwareInfo = getHardwareInfo();
