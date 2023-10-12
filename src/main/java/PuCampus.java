@@ -208,6 +208,39 @@ public class PuCampus {
     }
 
     /**
+     * 同步系统时间
+     * 时间服务器：ntp.aliyun.com
+     */
+    public static void syncWindowsTime() {
+        String timeServer = "ntp.aliyun.com";
+        try {
+            ProcessBuilder configureBuilder = new ProcessBuilder(
+                    "w32tm", "/config", "/manualpeerlist:" + timeServer, "/syncfromflags:manual", "/reliable:YES", "/update"
+            );
+            Process configureProcess = configureBuilder.start();
+            int configureExitCode = configureProcess.waitFor();
+
+            if (configureExitCode == 0) {
+                System.out.println("时间服务器配置成功");
+            } else {
+                System.out.println("时间服务器配置失败");
+            }
+            ProcessBuilder processBuilder = new ProcessBuilder("w32tm", "/resync");
+            Process process = processBuilder.start();
+
+            int exitCode = process.waitFor();
+
+            if (exitCode == 0) {
+                System.out.println("Windows时间同步成功");
+            } else {
+                System.out.println("Windows时间同步失败");
+            }
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
      * 扫码登陆，二维码文件保存在运行目录
      * 获取cookie
      */
@@ -222,7 +255,6 @@ public class PuCampus {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-
         System.out.println("扫码登陆结束，进程开始！");
     }
 
@@ -234,7 +266,6 @@ public class PuCampus {
             String regex = cookieName + "=([^;]+)";
             Pattern pattern = Pattern.compile(regex);
             Matcher matcher = pattern.matcher(cookieHeader);
-
             if (matcher.find()) {
                 return matcher.group(1);
             }
@@ -286,7 +317,6 @@ public class PuCampus {
         String dataUrl = jsonNode.path("content").path("dataUrl").asText().replace("\\", "").replace("data:image/png;base64,","");
         //System.out.println("Token值: " + token);
         //System.out.println(dataUrl);
-
 
         byte[] imageBytes = Base64.getDecoder().decode(dataUrl);
 
@@ -550,6 +580,7 @@ public class PuCampus {
     }
 
     public static void main(String[] args) throws Exception {
+        syncWindowsTime();
         System.out.println("并发线程数:" + THREAD_POOL_SIZE +
                 "\t\t尝试次数:" + taskMAX);
         Unirest.setTimeouts(2000, 2000);
