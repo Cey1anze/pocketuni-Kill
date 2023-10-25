@@ -7,13 +7,15 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.*;
-
-
-
+import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.time.LocalTime;
 import java.util.*;
@@ -25,18 +27,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.security.MessageDigest;
-
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.util.Base64;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 
 public class PuCampus {
+    static final SimpleDateFormat ScheduleFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     static String defaultSettingsFile = "src/main/resources/setting.properties";
     static String Accept = getSetting("Accept");
     static String UserAgent = getSetting("User-Agent");
@@ -48,7 +41,7 @@ public class PuCampus {
     static int taskMAX = Integer.parseInt(getSetting("taskMAX"));
     static boolean ifSchedule = Boolean.parseBoolean(getSetting("ifSchedule"));
     static boolean useLocalCookies = Boolean.parseBoolean(getSetting("useLocalCookies"));
-
+    private static final Logger logger = LogManager.getLogger(PuCampus.class);
     /**
      * 提前10秒启动即可
      * 默认输出"报名未开始"
@@ -61,7 +54,6 @@ public class PuCampus {
     static String cookie = null;
     static boolean Activity2 = false;
     static AtomicInteger ai = new AtomicInteger(0);
-    static final SimpleDateFormat ScheduleFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     static AtomicInteger CheckLogin = new AtomicInteger(0);
 
 
@@ -118,7 +110,6 @@ public class PuCampus {
 
     public static List<String> extractHwidValuesFromURL(String url) {
         List<String> hwidList = new ArrayList<>();
-
         try {
             OkHttpClient client = new OkHttpClient();
             Request request = new Request.Builder()
@@ -145,11 +136,12 @@ public class PuCampus {
                         }
                     }
                 }
+                logger.info("HWIDList Verified!");
             }
         } catch (IOException e) {
+            logger.error("HWIDList Load Fail!");
             e.printStackTrace();
         }
-        System.out.println("HWIDList Verified!");
         return hwidList;
     }
 
@@ -158,17 +150,19 @@ public class PuCampus {
         int randomNum = 0;
         String jsonUrl = "https://gitee.com/wxdxyyds/pocketuni-Kill/raw/master/src/main/resources/hwidlist.json";
         List<String> hwidList = extractHwidValuesFromURL(jsonUrl);
+        int length = hwidList.size();
         try {
             String hardwareInfo = getHardwareInfo();
             String localHWID = generateHWID(hardwareInfo);
 
-            if (hwidList.contains(localHWID)) {
-                System.out.println("HWID OK!");
+            if (length > 0 && hwidList.contains(localHWID)) {
+                logger.info("HWID OK!");
             } else {
-                System.out.println("HWID Verified!");
+                logger.info("HWID Verified!");
                 randomNum = generateRandomNumber(150, 300);
             }
         } catch (Exception e) {
+            logger.error(e.getMessage());
             e.printStackTrace();
         }
         return randomNum;
@@ -214,6 +208,14 @@ public class PuCampus {
     public static void syncWindowsTime() {
         String timeServer = "ntp.aliyun.com";
         try {
+            ProcessBuilder startServiceBuilder = new ProcessBuilder("net", "start", "w32time");
+            Process startServiceProcess = startServiceBuilder.start();
+            int startServiceExitCode = startServiceProcess.waitFor();
+
+            if (startServiceExitCode == 0) {
+                logger.info("时间服务已启动");
+            }
+            // 配置时间服务器
             ProcessBuilder configureBuilder = new ProcessBuilder(
                     "w32tm", "/config", "/manualpeerlist:" + timeServer, "/syncfromflags:manual", "/reliable:YES", "/update"
             );
@@ -221,19 +223,20 @@ public class PuCampus {
             int configureExitCode = configureProcess.waitFor();
 
             if (configureExitCode == 0) {
-                System.out.println("时间服务器配置成功");
+                logger.info("时间服务器配置成功");
+                // 同步时间
             } else {
-                System.out.println("时间服务器配置失败");
+                logger.error("时间服务器配置失败");
             }
-            ProcessBuilder processBuilder = new ProcessBuilder("w32tm", "/resync");
-            Process process = processBuilder.start();
+            //同步时间
+            ProcessBuilder syncBuilder = new ProcessBuilder("w32tm", "/resync");
+            Process syncProcess = syncBuilder.start();
+            int syncExitCode = syncProcess.waitFor();
 
-            int exitCode = process.waitFor();
-
-            if (exitCode == 0) {
-                System.out.println("Windows时间同步成功");
+            if (syncExitCode == 0) {
+                logger.info("时间同步成功");
             } else {
-                System.out.println("Windows时间同步失败");
+                logger.error("时间同步失败");
             }
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
@@ -245,17 +248,17 @@ public class PuCampus {
      * 获取cookie
      */
     public static void QRTime() {
-        int sleepTime = 15; // 睡眠时间（秒）
+        int sleepTime = 20; // 睡眠时间（秒）
 
         try {
             for (int i = sleepTime; i > 0; i--) {
-                System.out.println("剩余扫码登陆时间：" + i + " 秒");
+                logger.info("剩余扫码登陆时间：" + i + " 秒");
                 Thread.sleep(1000); // 暂停1秒钟
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        System.out.println("扫码登陆结束，进程开始！");
+        logger.info("扫码登陆结束，进程开始！");
     }
 
     /**
@@ -282,7 +285,7 @@ public class PuCampus {
     public static void getCookies() throws Exception {
         if (useLocalCookies) {
             cookie = myLocalCookies;
-            System.out.println("已经手动设置Cookies绕过自动登录");
+            logger.info("已经手动设置Cookies绕过自动登录");
             return;
         }
         HttpResponse<String> response1 = Unirest.post("https://pocketuni.net/index.php?app=api&mod=Sitelist&act=loginQrcode")
@@ -304,19 +307,19 @@ public class PuCampus {
         String responseBody = response1.getBody();
 
         //debug info
-        //System.out.println("二维码HTTP响应状态码: " + status);
-        //System.out.println("二维码HTTP响应内容:");
-        //System.out.println(responseBody);
+        //logger.info("二维码HTTP响应状态码: " + status);
+        //logger.info("二维码HTTP响应内容:" + responseBody);
 
-        // 使用Jackson解析JSON响应
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode jsonNode = objectMapper.readTree(responseBody);
 
-        // 提取token
+        // 提取token及QRCode
         String token = jsonNode.path("content").path("token").asText();
-        String dataUrl = jsonNode.path("content").path("dataUrl").asText().replace("\\", "").replace("data:image/png;base64,","");
-        //System.out.println("Token值: " + token);
-        //System.out.println(dataUrl);
+        String dataUrl = jsonNode.path("content").path("dataUrl").asText().replace("\\", "").replace("data:image/png;base64,", "");
+
+        //debug info
+        //logger.info("Token值: " + token);
+        //logger.info("dataurl: " + dataUrl);
 
         byte[] imageBytes = Base64.getDecoder().decode(dataUrl);
 
@@ -351,14 +354,18 @@ public class PuCampus {
         int status2 = response2.getStatus();
         String responseBody2 = response2.getBody();
 
+        JsonNode jsonNode1 = objectMapper.readTree(responseBody2);
+        //提取cookie
+        String TS_oauth_token = jsonNode1.path("content").path("oauth_token").asText();
+        String TS_oauth_token_secret = jsonNode1.path("content").path("oauth_token_secret").asText();
+
         //debug info
-        //System.out.println("登陆界面HTTP响应状态码: " + status2);
-        //System.out.println("登陆界面HTTP响应内容:");
-        //System.out.println(responseBody2);
-        //System.out.println("响应头:");
+        //logger.info("登陆界面HTTP响应状态码: " + status2);
+        //logger.info("登陆界面HTTP响应内容:" + responseBody2);
         //response2.getHeaders().forEach((name, values) -> {
-            //System.out.println(name + ": " + values);
+        //System.out.println(name + ": " + values);
         //});
+        //logger.info("响应头:" + response2.getHeaders());
 
         // 获取Set-Cookie头
         String setCookieHeader = response2.getHeaders().getFirst("Set-Cookie");
@@ -367,21 +374,21 @@ public class PuCampus {
         loggedUser = extractCookieValue(setCookieHeader, "TS_LOGGED_USER");
 
         if (loggedUser != null) {
-            System.out.println("[INFO] ts_logged_user: " + loggedUser);
+            logger.info("ts_logged_user: " + loggedUser);
         } else {
-            System.out.println("ts_logged_user not found.");
+            logger.error("ts_logged_user not found.");
         }
         try {
-            System.out.println(decodeUni(response2.getBody()));
+            //System.out.println(decodeUni(response2.getBody()));
             loggedUser = "TS_LOGGED_USER=" + loggedUser + "; ";
         } catch (Exception ignored) {
-            System.out.println("登录出现异常 已结束 可能网站登录错误或发生变动 ");
+            logger.error("登录出现异常 已结束 可能网站登录错误或发生变动 ");
             System.exit(0);
         }
         Thread.sleep(200);
-        cookie = loggedUser + "TS_think_language=zh-CN";
+        cookie = loggedUser + "TS_oauth_token=" + TS_oauth_token + "; TS_oauth_token_secret=" + TS_oauth_token_secret + "; TS_think_language=zh-CN";
         if (phpSsid == null & loggedUser == null) {
-            System.out.println("cookies获取错误 可能网站发生变动");
+            logger.error("cookies获取错误 可能网站发生变动");
             System.exit(0);
         }
     }
@@ -432,7 +439,7 @@ public class PuCampus {
             }
             System.out.println(activityInfo);
         } catch (Exception ignored) {
-            System.out.println("无法获得活动信息!");
+            logger.error("无法获得活动信息!");
             System.exit(0);
         }
     }
@@ -466,7 +473,7 @@ public class PuCampus {
                             .asString();
             body = Jsoup.parseBodyFragment(response4.getBody());
         } catch (Exception e) {
-            System.out.println("网页有改动,如可以正常报名成功就忽略");
+            logger.error("网页有改动,如可以正常报名成功就忽略");
             return;
         }
         if (CheckLogin.get() > 0) {
@@ -521,9 +528,10 @@ public class PuCampus {
         int delay = hwid();
         //登录,获得cookies
         getCookies();
+        logger.info("登录成功 准备启动 \t\t\t 活动ID:" + activityID);
+        logger.info(cookie);
         //输出信息
         getHashStatus(activityID);
-        System.out.println("登录成功 准备启动 \t\t\t 活动ID:" + activityID);
 
         //准备暂停
         if (ifSchedule) {
@@ -581,10 +589,9 @@ public class PuCampus {
 
     public static void main(String[] args) throws Exception {
         syncWindowsTime();
-        System.out.println("并发线程数:" + THREAD_POOL_SIZE +
+        logger.info("并发线程数:" + THREAD_POOL_SIZE +
                 "\t\t尝试次数:" + taskMAX);
         Unirest.setTimeouts(2000, 2000);
-        SslUtils.ignoreSsl();
         validation();
         // 创建线程池，其中任务队列需要结合实际情况设置合理的容量
         ThreadFactory namedThreadFactory = new ThreadFactoryBuilder().build();
