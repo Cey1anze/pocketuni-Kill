@@ -3,10 +3,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jsoup.Jsoup;
@@ -15,10 +11,11 @@ import org.jsoup.nodes.Element;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.security.MessageDigest;
-import java.text.SimpleDateFormat;
 import java.time.LocalTime;
-import java.util.*;
+import java.util.Base64;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Properties;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -29,11 +26,9 @@ import java.util.regex.Pattern;
 
 
 public class PuCampus {
-    static final SimpleDateFormat ScheduleFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     static String defaultSettingsFile = "src/main/resources/setting.properties";
     static String Accept = getSetting("Accept");
     static String UserAgent = getSetting("User-Agent");
-    static String mySchedule = getSetting("mySchedule");
     static String myLocalCookies = getSetting("myCookies");
     static int activityID = Integer.parseInt(getSetting("activityID_1"));
     static int activityID_2 = Integer.parseInt(getSetting("activityID_2"));
@@ -108,99 +103,6 @@ public class PuCampus {
     }
 
 
-    public static List<String> extractHwidValuesFromURL(String url) {
-        List<String> hwidList = new ArrayList<>();
-        try {
-            OkHttpClient client = new OkHttpClient();
-            Request request = new Request.Builder()
-                    .url(url)
-                    .build();
-
-            Response response = client.newCall(request).execute();
-            if (response.isSuccessful()) {
-                ResponseBody responseBody = response.body();
-                if (responseBody != null) {
-                    String json = responseBody.string();
-
-                    // 解析JSON，提取Hwid值
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    JsonNode root = objectMapper.readTree(json);
-
-                    if (root.isArray()) {
-                        for (JsonNode node : root) {
-                            JsonNode hwidNode = node.get("hwid");
-                            if (hwidNode != null && hwidNode.isTextual()) {
-                                String hwid = hwidNode.asText();
-                                hwidList.add(hwid);
-                            }
-                        }
-                    }
-                }
-                logger.info("HWIDList Verified!");
-            }
-        } catch (IOException e) {
-            logger.error("HWIDList Load Fail!");
-            e.printStackTrace();
-        }
-        return hwidList;
-    }
-
-    public static int hwid() {
-
-        int randomNum = 0;
-        String jsonUrl = "https://gitee.com/wxdxyyds/pocketuni-Kill/raw/master/src/main/resources/hwidlist.json";
-        List<String> hwidList = extractHwidValuesFromURL(jsonUrl);
-        int length = hwidList.size();
-        try {
-            String hardwareInfo = getHardwareInfo();
-            String localHWID = generateHWID(hardwareInfo);
-
-            if (length > 0 && hwidList.contains(localHWID)) {
-                logger.info("HWID OK!");
-            } else {
-                logger.info("HWID Verified!");
-                randomNum = generateRandomNumber(150, 300);
-            }
-        } catch (Exception e) {
-            logger.error(e.getMessage());
-            e.printStackTrace();
-        }
-        return randomNum;
-    }
-
-    public static String getHardwareInfo() throws Exception {
-        StringBuilder hardwareInfo = new StringBuilder();
-        String line;
-
-        Process process = Runtime.getRuntime().exec("wmic csproduct get uuid");
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-
-        while ((line = reader.readLine()) != null) {
-            hardwareInfo.append(line);
-        }
-
-        reader.close();
-
-        return hardwareInfo.toString();
-    }
-
-    public static String generateHWID(String hardwareInfo) throws Exception {
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        byte[] hashBytes = md.digest(hardwareInfo.getBytes());
-
-        StringBuilder hwid = new StringBuilder();
-        for (byte b : hashBytes) {
-            hwid.append(String.format("%02x", b));
-        }
-
-        return hwid.toString();
-    }
-
-    public static int generateRandomNumber(int min, int max) {
-        Random random = new Random();
-        return random.nextInt((max - min) + 1) + min;
-    }
-
     /**
      * 同步系统时间
      * 时间服务器：ntp.aliyun.com
@@ -241,6 +143,21 @@ public class PuCampus {
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * 获取当前日期
+     */
+    public static long getTime() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(Calendar.HOUR_OF_DAY, 9);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+
+        Date date = calendar.getTime();
+
+        return date.getTime();
     }
 
     /**
@@ -525,7 +442,7 @@ public class PuCampus {
      * @throws Exception e
      */
     public static void validation() throws Exception {
-        int delay = hwid();
+        int delay = GetHwid.hwid();
         //登录,获得cookies
         getCookies();
         logger.info("登录成功 准备启动 \t\t\t 活动ID:" + activityID);
@@ -536,11 +453,11 @@ public class PuCampus {
         //准备暂停
         if (ifSchedule) {
             try {
-                Long timestampStartTime = ScheduleFormat.parse(mySchedule).getTime();
+                Long timestampStartTime = getTime();
                 Long timestampSNowTime = System.currentTimeMillis();
                 long sleepTime = timestampStartTime - timestampSNowTime;
                 if (sleepTime > 0) {
-                    System.out.println(mySchedule + "准备运行, 本进程现在休眠  " + sleepTime / 3600000 + "时"
+                    System.out.println("准备运行, 本进程现在休眠  " + sleepTime / 3600000 + "时"
                             + (sleepTime % 3600000) / 60000 + "分" + sleepTime % 60000 / 1000 + "秒...");
                     Thread.sleep(sleepTime + delay);
                     //-------------------------------------------//

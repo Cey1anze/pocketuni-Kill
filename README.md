@@ -29,9 +29,9 @@
   
   activityID_1=（活动ID，获取方式见下）
   
-  ifSchedule=（true 为定时抢活动，false为立即抢活动，推荐使用true，并定时到活动报名开始时间）
+  ifSchedule= true / false
   
-  mySchedule=（严格按照格式）
+  （如果设置为 **false** ，程序启动后会 **立即** 发起若干次请求，无论是否在报名时间内，是否抢到活动，在请求全部发送完毕后程序都会直接结束，所以推荐设置为 **true** ，这样程序将会在活动报名开始时发起请求）
   
   useLocalCookies=false（关闭cookie登录）
 
@@ -47,9 +47,7 @@
   
   activityID_1=（活动ID，获取方式见下）
   
-  ifSchedule=（true 为定时抢活动，false为立即抢活动，推荐使用true，并定时到活动报名开始时间）
-  
-  mySchedule=（严格按照格式）
+  ifSchedule=（推荐设置A方法）
   
   useLocalCookies=true（开启cookie登录）
 
@@ -79,4 +77,4 @@
 
 - 除上面提到的参数需要自行修改，其余所有参数请不要改动，否则程序无法运行
 
-- 定时时间一定要严格按照示例格式输入，使用24小时制！！！
+- 
