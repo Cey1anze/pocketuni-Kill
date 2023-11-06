@@ -530,7 +530,7 @@ public class PuCampus {
                     if (Activity2) {
                         tryOnce(activityID_2);
                     }
-                    if (Math.random() < 0.1) {
+                    if (Math.random() < 0.05) {
                         //每十次检查一下是否报名成功
                         if (!Activity2) {
                             getHashStatus(activityID);
