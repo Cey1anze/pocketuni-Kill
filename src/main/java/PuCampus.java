@@ -290,22 +290,24 @@ public class PuCampus {
         // 使用正则表达式提取ts_logged_user的值
         loggedUser = extractCookieValue(setCookieHeader, "TS_LOGGED_USER");
 
-        if (loggedUser != null) {
-            logger.info("ts_logged_user: " + loggedUser);
-        } else {
-            logger.error("ts_logged_user not found.");
-        }
         try {
             //System.out.println(decodeUni(response2.getBody()));
-            loggedUser = "TS_LOGGED_USER=" + loggedUser + "; ";
+            if (loggedUser == null) {
+                logger.error("loggedUser获取错误");
+                System.exit(0);
+            }
+            else {
+                loggedUser = "TS_LOGGED_USER=" + loggedUser + "; ";
+            }
+            if (TS_oauth_token == null || TS_oauth_token_secret == null){
+                logger.error("cookies获取错误");
+                System.exit(0);
+            }
+            else {
+                cookie = loggedUser + "TS_oauth_token=" + TS_oauth_token + "; TS_oauth_token_secret=" + TS_oauth_token_secret + "; TS_think_language=zh-CN";
+            }
         } catch (Exception ignored) {
             logger.error("登录出现异常 已结束 可能网站登录错误或发生变动 ");
-            System.exit(0);
-        }
-        Thread.sleep(200);
-        cookie = loggedUser + "TS_oauth_token=" + TS_oauth_token + "; TS_oauth_token_secret=" + TS_oauth_token_secret + "; TS_think_language=zh-CN";
-        if (phpSsid == null & loggedUser == null) {
-            logger.error("cookies获取错误 可能网站发生变动");
             System.exit(0);
         }
     }
@@ -445,11 +447,21 @@ public class PuCampus {
         int delay = GetHwid.hwid();
         //登录,获得cookies
         getCookies();
-        logger.info("登录成功 准备启动 \t\t\t 活动ID:" + activityID);
         logger.info(cookie);
+        logger.info("登录成功 准备启动");
         //输出信息
+        System.out.println("-".repeat(20) +" 活动详细信息 " + "-".repeat(20) + "\n第一个活动id:" + activityID);
         getHashStatus(activityID);
-
+        getActivityName(activityID);
+        //判断有几个活动
+        if (activityID_2 != 0) {
+            Activity2 = true;
+        }
+        if (Activity2) {
+            System.out.println("\n第二个活动id:" + activityID_2);
+            getHashStatus(activityID_2);
+            getActivityName(activityID_2);
+        }
         //准备暂停
         if (ifSchedule) {
             try {
@@ -467,18 +479,8 @@ public class PuCampus {
                 System.out.println("定时时间格式输入错误");
             }
         }
-        getActivityName(activityID);
-        //判断有几个活动
-        if (activityID_2 > 0) {
-            Activity2 = true;
-        }
-        if (Activity2) {
-            System.out.println("第二活动id:" + activityID_2);
-            getHashStatus(activityID_2);
-            getActivityName(activityID_2);
-        }
         System.out.println("--------------------START--------------------\n");
-        Thread.sleep(200);
+        Thread.sleep(50);
     }
 
     /**
@@ -522,6 +524,7 @@ public class PuCampus {
         long t1 = System.currentTimeMillis();
         //重设响应超时毫秒 超时的请求直接放弃
         Unirest.setTimeouts(800, 800);
+        AtomicInteger currentIteration = new AtomicInteger(0);
         // 新建 taskMAX 个任务，每个任务是打印当前线程名称
         for (int i = 0; i < taskMAX; i++) {
             executor.execute(() -> {
@@ -530,8 +533,8 @@ public class PuCampus {
                     if (Activity2) {
                         tryOnce(activityID_2);
                     }
-                    if (Math.random() < 0.05) {
-                        //每十次检查一下是否报名成功
+                    int checkFrequency = 2;
+                    if (currentIteration.incrementAndGet() %checkFrequency == 0) {
                         if (!Activity2) {
                             getHashStatus(activityID);
                         } else {
@@ -539,10 +542,11 @@ public class PuCampus {
                             getHashStatus(activityID_2);
                         }
                         System.out.print(ai.get());
+                        currentIteration.set(0);
                     }
                     //原子计数器自增
                     ai.incrementAndGet();
-                    System.out.println(LocalTime.now()); // 2019-11-20T15:04:29.017
+                    System.out.println("当前时间:" + LocalTime.now());
                 } catch (Exception ignored) {
                 }
             });
