@@ -8,13 +8,13 @@ import org.apache.logging.log4j.Logger;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 
+import java.text.SimpleDateFormat;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.time.LocalTime;
 import java.util.Base64;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.Properties;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+import java.util.Map;
 
 public class PuCampus {
     static String defaultSettingsFile = "src/main/resources/setting.properties";
@@ -34,6 +34,7 @@ public class PuCampus {
     static int activityID_2 = Integer.parseInt(getSetting("activityID_2"));
     static int THREAD_POOL_SIZE = Math.min(Integer.parseInt(getSetting("ThreadPool_Size")), 30);
     static int taskMAX = Integer.parseInt(getSetting("taskMAX"));
+    static boolean ifAutoSearch = Boolean.parseBoolean(getSetting("ifAutoSearch"));
     static boolean ifSchedule = Boolean.parseBoolean(getSetting("ifSchedule"));
     static boolean useLocalCookies = Boolean.parseBoolean(getSetting("useLocalCookies"));
     private static final Logger logger = LogManager.getLogger(PuCampus.class);
@@ -44,17 +45,15 @@ public class PuCampus {
     static String StatusStr = null;
     static volatile String hash = null;
     static String respText = null;
-    static String phpSsid = null;
     static String loggedUser = null;
     static String cookie = null;
     static boolean Activity2 = false;
+    static long timestampStartTime = 0;
+    static final SimpleDateFormat ScheduleFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     static AtomicInteger ai = new AtomicInteger(0);
     static AtomicInteger CheckLogin = new AtomicInteger(0);
-
-
     /**
      * 获得配置文件
-     *
      * @param keyWord 配置项
      * @return 配置项
      */
@@ -101,8 +100,6 @@ public class PuCampus {
         }
         return value;
     }
-
-
     /**
      * 同步系统时间
      * 时间服务器：ntp.aliyun.com
@@ -128,7 +125,7 @@ public class PuCampus {
                 logger.info("时间服务器配置成功");
                 // 同步时间
             } else {
-                logger.error("时间服务器配置失败");
+                logger.warn("时间服务器配置失败");
             }
             //同步时间
             ProcessBuilder syncBuilder = new ProcessBuilder("w32tm", "/resync");
@@ -138,28 +135,12 @@ public class PuCampus {
             if (syncExitCode == 0) {
                 logger.info("时间同步成功");
             } else {
-                logger.error("时间同步失败");
+                logger.warn("时间同步失败");
             }
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
     }
-
-    /**
-     * 获取当前日期
-     */
-    public static long getTime() {
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(Calendar.HOUR_OF_DAY, 9);
-        calendar.set(Calendar.MINUTE, 0);
-        calendar.set(Calendar.SECOND, 0);
-        calendar.set(Calendar.MILLISECOND, 0);
-
-        Date date = calendar.getTime();
-
-        return date.getTime();
-    }
-
     /**
      * 扫码登陆，二维码文件保存在运行目录
      * 获取cookie
@@ -177,7 +158,6 @@ public class PuCampus {
         }
         logger.info("扫码登陆结束，进程开始！");
     }
-
     /**
      * 解析cookie内容
      */
@@ -192,7 +172,6 @@ public class PuCampus {
         }
         return null;
     }
-
     /**
      * 使用账号密码自动登录
      * 获取cookie中的PhpSsid TS_LOGGED_USER
@@ -311,7 +290,6 @@ public class PuCampus {
             System.exit(0);
         }
     }
-
     /**
      * unicode转换成中文 工具类
      *
@@ -326,7 +304,40 @@ public class PuCampus {
         return sb.toString();
     }
 
+    public static String autoGetActivityName() throws Exception {
+        HttpResponse<String> autoresponse =
+                Unirest.get("https://pocketuni.net/index.php?app=event&mod=School&act=board&titkey=%E5%85%AC%E7%9B%8A%E5%8A%B3%E5%8A%A8%E4%B9%8B%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%B7%A5%E7%A8%8B%E5%AD%A6%E9%99%A2")
+                        .header("Host", "pocketuni.net")
+                        .header("Connection", "keep-alive")
+                        .header("Cache-Control", "no-cache")
+                        .header("Upgrade-Insecure-Requests", "1")
+                        .header("User-Agent", UserAgent)
+                        .header("Accept", Accept)
+                        .header("Accept-Encoding", "gzip, deflate")
+                        .header("Accept-Language", "zh-CN,zh;q=0.9")
+                        .header("Cookie", cookie)
+                        .asString();
+        return autoresponse.getBody();
+    }
 
+
+    public static void autoselect() throws Exception {
+        String htmlContent = autoGetActivityName();
+        Map<String, String> titleAndTimeMap = AutoSelectActivity.extractTitleAndTime(htmlContent);
+
+        // 打印提取的 hd_c_left_title 和 hd_c_left_time 对
+        logger.debug("ActivityID and Time:");
+        for (Map.Entry<String, String> entry : titleAndTimeMap.entrySet()) {
+            logger.debug("ID: " + entry.getKey() + ", Start Time: " + entry.getValue());
+        }
+        AutoSelectActivity.compareDates(titleAndTimeMap);
+        activityID = AutoSelectActivity.activityid;
+        activityID_2 = AutoSelectActivity.activityid2;
+
+        timestampStartTime = AutoSelectActivity.timestampStartTime;
+        logger.debug("Selected id:" + activityID);
+        logger.debug("Selected id2:" + activityID_2);
+    }
     /**
      * 获得活动名字 非关键
      *
@@ -362,7 +373,6 @@ public class PuCampus {
             System.exit(0);
         }
     }
-
     /**
      * 获取hash值和当前状态
      * 同时可以判断是否登录成功
@@ -437,7 +447,6 @@ public class PuCampus {
             System.exit(0);
         }
     }
-
     /**
      * 延时启动  验证密码和 cookies 准备启动
      *
@@ -449,6 +458,10 @@ public class PuCampus {
         getCookies();
         logger.info(cookie);
         logger.info("登录成功 准备启动");
+        timestampStartTime = ScheduleFormat.parse(getSetting("StartTime")).getTime();
+        if(ifAutoSearch){
+            autoselect();
+        }
         //输出信息
         System.out.println("-".repeat(20) +" 活动详细信息 " + "-".repeat(20) + "\n第一个活动id:" + activityID);
         getHashStatus(activityID);
@@ -465,8 +478,7 @@ public class PuCampus {
         //准备暂停
         if (ifSchedule) {
             try {
-                Long timestampStartTime = getTime();
-                Long timestampSNowTime = System.currentTimeMillis();
+                long timestampSNowTime = System.currentTimeMillis();
                 long sleepTime = timestampStartTime - timestampSNowTime;
                 if (sleepTime > 0) {
                     System.out.println("准备运行, 本进程现在休眠  " + sleepTime / 3600000 + "时"
@@ -482,7 +494,6 @@ public class PuCampus {
         System.out.println("--------------------START--------------------\n");
         Thread.sleep(50);
     }
-
     /**
      * 尝试并发请求
      */
@@ -507,6 +518,19 @@ public class PuCampus {
     }
 
     public static void main(String[] args) throws Exception {
+
+        try {
+            String latestVersion = GetHwid.getLatestVersion();
+            String currentVersion = "2.0";
+            //检查新版本
+            if (latestVersion != null && latestVersion.compareTo(currentVersion) > 0) {
+                logger.warn("发现新版本：" + latestVersion + " ,请尽快更新最新版本");
+            } else {
+                logger.info("当前已是最新版本：" + currentVersion);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         syncWindowsTime();
         logger.info("并发线程数:" + THREAD_POOL_SIZE +
                 "\t\t尝试次数:" + taskMAX);
@@ -541,7 +565,6 @@ public class PuCampus {
                             getHashStatus(activityID);
                             getHashStatus(activityID_2);
                         }
-                        System.out.print(ai.get());
                         currentIteration.set(0);
                     }
                     //原子计数器自增
