@@ -518,10 +518,10 @@ public class PuCampus {
     }
 
     public static void main(String[] args) throws Exception {
-
+        EnvironmentChecker.checkJava();
         try {
             String latestVersion = GetHwid.getLatestVersion();
-            String currentVersion = "2.0";
+            String currentVersion = "2.0-fix_1";
             //检查新版本
             if (latestVersion != null && latestVersion.compareTo(currentVersion) > 0) {
                 logger.warn("发现新版本：" + latestVersion + " ,请尽快更新最新版本");
