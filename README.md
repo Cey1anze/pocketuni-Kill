@@ -81,24 +81,6 @@
 
 ![](https://cdn.jsdelivr.net/gh/Cey1anze/Blog_Images@main/pic/202311061804261.png)
 
-## 上午有课又不想带电脑怎么办
-
-- 进入贝锐官网，创建贝锐账户 -> [贝锐蒲公英软件客户端官方下载 - 贝锐蒲公英官网](https://pgy.oray.com/download/)
-
-- 下载贝锐蒲公英
-
-- 上午出门前打开电脑，登录进蒲公英软件
-  
-  ![](https://cdn.jsdelivr.net/gh/Cey1anze/Blog_Images@main/pic/202311061819260.png)
-
-- 在机房电脑上下载贝锐蒲公英并登录
-
-- 点击开始左下角开始菜单，找到windows附件中的远程桌面连接，输入自己电脑的ip地址（蒲公英里面查看），输入用户名和密码远程登录自己的电脑
-  
-   ![](https://cdn.jsdelivr.net/gh/Cey1anze/Blog_Images@main/pic/202311061825056.png)
-
-- 获得控制后干什么都行喽（205机房控制软件lab-manager的密码是jszx205，输完密码后直接退出lab-manager即可，不要做任何其他操作，否则轻则老师改密码，重则。。。切记！！）
-
 ### 提示
 
 - 本程序仅作为辅助工具，请不要完全信赖程序可以抢到活动，李姐万岁
