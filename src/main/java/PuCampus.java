@@ -13,14 +13,10 @@ import java.text.SimpleDateFormat;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.time.LocalTime;
 import java.util.Base64;
 import java.util.Calendar;
 import java.util.Properties;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -40,10 +36,6 @@ public class PuCampus {
     static boolean ifAutoSearch = Boolean.parseBoolean(getSetting("ifAutoSearch"));
     static boolean ifSchedule = Boolean.parseBoolean(getSetting("ifSchedule"));
     static boolean useLocalCookies = Boolean.parseBoolean(getSetting("useLocalCookies"));
-    /**
-     * 提前10秒启动即可
-     * 默认输出"报名未开始"
-     */
     static String StatusStr = null;
     static volatile String hash = null;
     static String respText = null;
@@ -51,12 +43,11 @@ public class PuCampus {
     static String cookie = null;
     static boolean Activity2 = false;
     static long timestampStartTime = 0;
-    static AtomicInteger ai = new AtomicInteger(0);
     static AtomicInteger CheckLogin = new AtomicInteger(0);
+    private static long t1;
 
     /**
      * 获得配置文件
-     *
      * @param keyWord 配置项
      * @return 配置项
      */
@@ -178,7 +169,6 @@ public class PuCampus {
     /**
      * 使用账号密码自动登录
      * 获取cookie中的PhpSsid TS_LOGGED_USER
-     *
      * @throws Exception e
      */
     public static void getCookies() throws Exception {
@@ -329,7 +319,6 @@ public class PuCampus {
 
     /**
      * 获得活动名字 非关键
-     *
      * @param id 活动id
      * @throws Exception e
      */
@@ -401,14 +390,23 @@ public class PuCampus {
                 hash = body.getElementsByAttributeValue("name", "__hash__").get(0).attr("value");
                 System.out.println("活动ID:" + id + "\t" + respText);
                 CheckLogin.incrementAndGet();
-                if (CheckLogin.get() > 2 && (respText.contains("成功") || respText.contains("名额已满") || respText.contains("结束"))) {
+                if (respText.contains("成功")) {
                     Thread.yield();
+                    System.out.println("---Done---");
+                    long t2 = System.currentTimeMillis();
+                    Calendar c = Calendar.getInstance();
+                    //统计运算时间
+                    c.setTimeInMillis(t2 - t1);
+                    System.out.println("耗时: " + c.get(Calendar.MINUTE) + "分 "
+                            + c.get(Calendar.SECOND) + "秒 " + c.get(Calendar.MILLISECOND) + " 微秒");
                     System.exit(0);
+                }else if (respText.contains("已满")||respText.contains("结束")) {
+                    return;
                 }
-                return;
             } catch (Exception ignored) {
                 return;
             }
+            return;
         }
         //初次使用此函数需要验证登录
         try {
@@ -418,21 +416,15 @@ public class PuCampus {
                 System.out.println("活动不存在 ");
                 System.exit(0);
             }
-            if (respText.contains("苏州天宫")) {
-                System.out.println(respText.split("苏州天宫")[0]);
-            } else System.out.println(respText);
             hash = body.getElementsByAttributeValue("name", "__hash__").get(0).attr("value");
             StatusStr = body.getElementsByClass("b").text();
-            if (!StatusStr.isEmpty()) {
-                System.out.println(StatusStr);
-            }
             CheckLogin.incrementAndGet();
         } catch (Exception ignored) {
             System.out.println("登录失败");
             if (useLocalCookies) {
                 System.out.println("手动输入了错误或过时的Cookies:" + cookie);
             } else {
-                System.out.println("账号密码或学校代码错误");
+                System.out.println("学校代码错误");
             }
             System.exit(0);
         }
@@ -440,7 +432,6 @@ public class PuCampus {
 
     /**
      * 延时启动  验证密码和 cookies 准备启动
-     *
      * @throws Exception e
      */
     public static void validation() throws Exception {
@@ -454,7 +445,7 @@ public class PuCampus {
             autoselect();
         }
         //输出信息
-        System.out.println("-".repeat(20) + " 活动详细信息 " + "-".repeat(20) + "\n第一个活动id:" + activityID);
+        System.out.println("-".repeat(20) + " 活动详细信息 " + "-".repeat(20) + "\n活动id:" + activityID);
         getHashStatus(activityID);
         getActivityName(activityID);
         //判断有几个活动
@@ -462,7 +453,7 @@ public class PuCampus {
             Activity2 = true;
         }
         if (Activity2) {
-            System.out.println("\n第二个活动id:" + activityID_2);
+            System.out.println("\n活动id:" + activityID_2);
             getHashStatus(activityID_2);
             getActivityName(activityID_2);
         }
@@ -508,70 +499,70 @@ public class PuCampus {
         }
     }
 
+    /**
+     * 创建线程池
+     */
+    private static ExecutorService createThreadPool() {
+        ThreadFactory namedThreadFactory = new ThreadFactoryBuilder().build();
+        return Executors.newFixedThreadPool(THREAD_POOL_SIZE, namedThreadFactory);
+    }
+
+    /**
+     * 活动报名及状态检查任务逻辑
+     * @param activityID 活动id
+     * @param taskCounter 循环检查次数
+     */
+    private static void executeTask(long activityID, AtomicInteger taskCounter) {
+        try {
+            taskCounter.getAndIncrement();
+            tryOnce(activityID);
+            if (taskCounter.get() % 2 == 0) {
+                getHashStatus(activityID);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         EnvironmentChecker.checkJava();
+
         try {
             String latestVersion = GetHwid.getLatestVersion();
             String currentVersion = "2.0.1";
-            //检查新版本
+            // 检查新版本
             if (latestVersion != null && latestVersion.compareTo(currentVersion) > 0) {
-                logger.warn("发现新版本：" + latestVersion + " ,请尽快更新最新版本");
-                logger.warn("最新版本下载地址：https://gitee.com/wxdxyyds/pocketuni-Kill/releases");
+                logger.warn("新版本可用: " + latestVersion + ", 请尽快更新到新版本.");
+                logger.warn("最新版本下载地址: https://gitee.com/wxdxyyds/pocketuni-Kill/releases");
             } else {
-                logger.info("当前已是最新版本：" + currentVersion);
+                logger.info("已经是最新版本: " + currentVersion);
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
+
         syncWindowsTime();
-        logger.info("并发线程数:" + THREAD_POOL_SIZE +
-                "\t\t尝试次数:" + taskMAX);
+        logger.info("线程池大小: " + THREAD_POOL_SIZE + "\t\t任务数: " + taskMAX);
         Unirest.setTimeouts(2000, 2000);
         validation();
-        // 创建线程池，其中任务队列需要结合实际情况设置合理的容量
-        ThreadFactory namedThreadFactory = new ThreadFactoryBuilder().build();
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(THREAD_POOL_SIZE,
-                THREAD_POOL_SIZE + 1,
-                0L,
-                TimeUnit.MILLISECONDS,
-                new LinkedBlockingQueue<>(taskMAX),
-                namedThreadFactory,
-                new ThreadPoolExecutor.AbortPolicy());
-        long t1 = System.currentTimeMillis();
-        //重设响应超时毫秒 超时的请求直接放弃
-        Unirest.setTimeouts(800, 800);
-        // 新建 taskMAX 个任务，每个任务是打印当前线程名称
+
+        // 不同id不同线程池
+        ExecutorService executor1 = createThreadPool();
+        ExecutorService executor2 = createThreadPool();
+
+        t1 = System.currentTimeMillis();
+        AtomicInteger taskCounter = new AtomicInteger();
+
+        // 创建任务
         for (int i = 0; i < taskMAX; i++) {
-            executor.execute(() -> {
-                try {
-                    tryOnce(activityID);
-                    if (Activity2) {
-                        tryOnce(activityID_2);
-                    }
-                    if (Math.random() < 0.02) {
-                        if (!Activity2) {
-                            getHashStatus(activityID);
-                        } else {
-                            getHashStatus(activityID);
-                            getHashStatus(activityID_2);
-                        }
-                    }
-                    //原子计数器自增
-                    ai.incrementAndGet();
-                    System.out.println("当前时间:" + LocalTime.now());
-                } catch (Exception ignored) {
-                }
-            });
+            executor1.execute(() -> executeTask(activityID, taskCounter));
+            if (Activity2) {
+                executor2.execute(() -> executeTask(activityID_2, taskCounter));
+            }
         }
 
-        executor.shutdown();
-        executor.awaitTermination(1000L, TimeUnit.SECONDS);
-        System.out.println("---Done---");
-        long t2 = System.currentTimeMillis();
-        Calendar c = Calendar.getInstance();
-        //统计运算时间
-        c.setTimeInMillis(t2 - t1);
-        System.out.println("耗时: " + c.get(Calendar.MINUTE) + "分 "
-                + c.get(Calendar.SECOND) + "秒 " + c.get(Calendar.MILLISECOND) + " 微秒");
+        executor1.shutdown();
+        executor1.awaitTermination(1000L, TimeUnit.SECONDS);
+        executor2.shutdown();
+        executor2.awaitTermination(1000L, TimeUnit.SECONDS);
     }
 }
