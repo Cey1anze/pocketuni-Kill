@@ -349,7 +349,7 @@ public class PuCampus {
         Element body = Jsoup.parseBodyFragment(response3.getBody());
         try {
             String activityName = body.getElementsByClass("b").text();
-            System.out.println("活动名[[[ " + activityName + " ]]]");
+            System.out.println("活动名：[[[ " + activityName + " ]]]");
             String activityInfo =
                     body.getElementsByClass("content_hd_c").text();
             try {
@@ -401,7 +401,7 @@ public class PuCampus {
                 hash = body.getElementsByAttributeValue("name", "__hash__").get(0).attr("value");
                 System.out.println("活动ID:" + id + "\t" + respText);
                 CheckLogin.incrementAndGet();
-                if (CheckLogin.get() > 2 && respText.contains("成功")) {
+                if (CheckLogin.get() > 2 && (respText.contains("成功") || respText.contains("名额已满") || respText.contains("结束"))) {
                     Thread.yield();
                     System.exit(0);
                 }
@@ -430,7 +430,7 @@ public class PuCampus {
         } catch (Exception ignored) {
             System.out.println("登录失败");
             if (useLocalCookies) {
-                System.out.println("手动输入了错误或过时的Cookies" + cookie);
+                System.out.println("手动输入了错误或过时的Cookies:" + cookie);
             } else {
                 System.out.println("账号密码或学校代码错误");
             }
@@ -516,6 +516,7 @@ public class PuCampus {
             //检查新版本
             if (latestVersion != null && latestVersion.compareTo(currentVersion) > 0) {
                 logger.warn("发现新版本：" + latestVersion + " ,请尽快更新最新版本");
+                logger.warn("最新版本下载地址：https://gitee.com/wxdxyyds/pocketuni-Kill/releases");
             } else {
                 logger.info("当前已是最新版本：" + currentVersion);
             }
@@ -539,7 +540,6 @@ public class PuCampus {
         long t1 = System.currentTimeMillis();
         //重设响应超时毫秒 超时的请求直接放弃
         Unirest.setTimeouts(800, 800);
-        AtomicInteger currentIteration = new AtomicInteger(0);
         // 新建 taskMAX 个任务，每个任务是打印当前线程名称
         for (int i = 0; i < taskMAX; i++) {
             executor.execute(() -> {
@@ -548,15 +548,13 @@ public class PuCampus {
                     if (Activity2) {
                         tryOnce(activityID_2);
                     }
-                    int checkFrequency = 2;
-                    if (currentIteration.incrementAndGet() % checkFrequency == 0) {
+                    if (Math.random() < 0.02) {
                         if (!Activity2) {
                             getHashStatus(activityID);
                         } else {
                             getHashStatus(activityID);
                             getHashStatus(activityID_2);
                         }
-                        currentIteration.set(0);
                     }
                     //原子计数器自增
                     ai.incrementAndGet();

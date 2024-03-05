@@ -94,9 +94,10 @@ public class AutoSelectActivity {
     }
     /**
      * 配置活动id及开始时间
+     *
      * @param titleAndTimeMap 从网页中提取的活动标题和开始时间的 Map
      */
-    public static long compareDates(Map<String, String> titleAndTimeMap) {
+    public static void compareDates(Map<String, String> titleAndTimeMap) {
         // 获取当前系统日期
         LocalDate currentDate = LocalDate.now();
         //LocalDate currentDate = LocalDate.parse("2023-12-04");
@@ -134,10 +135,9 @@ public class AutoSelectActivity {
             LocalDateTime selectedDateTime = LocalDateTime.parse(selectedStartTime, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
             timestampStartTime = selectedDateTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
         }else {
-            logger.error("活动时间已过期");
+            logger.error("活动报名已结束或未到报名日期");
+            System.exit(0);
         }
 
-        // 如果没有符合条件的 startTime，则返回 -1
-        return -1;
     }
 }
