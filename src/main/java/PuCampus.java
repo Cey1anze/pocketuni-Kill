@@ -8,6 +8,7 @@ import org.apache.logging.log4j.Logger;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -26,18 +27,19 @@ import java.util.regex.Pattern;
 import java.util.Map;
 
 public class PuCampus {
+    static final SimpleDateFormat ScheduleFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private static final Logger logger = LogManager.getLogger(PuCampus.class);
     static String defaultSettingsFile = "src/main/resources/setting.properties";
     static String Accept = getSetting("Accept");
     static String UserAgent = getSetting("User-Agent");
     static String myLocalCookies = getSetting("myCookies");
-    static int activityID = Integer.parseInt(getSetting("activityID_1"));
-    static int activityID_2 = Integer.parseInt(getSetting("activityID_2"));
+    static long activityID = Long.parseLong((getSetting("activityID_1")));
+    static long activityID_2 = Long.parseLong(getSetting("activityID_2"));
     static int THREAD_POOL_SIZE = Math.min(Integer.parseInt(getSetting("ThreadPool_Size")), 30);
     static int taskMAX = Integer.parseInt(getSetting("taskMAX"));
     static boolean ifAutoSearch = Boolean.parseBoolean(getSetting("ifAutoSearch"));
     static boolean ifSchedule = Boolean.parseBoolean(getSetting("ifSchedule"));
     static boolean useLocalCookies = Boolean.parseBoolean(getSetting("useLocalCookies"));
-    private static final Logger logger = LogManager.getLogger(PuCampus.class);
     /**
      * 提前10秒启动即可
      * 默认输出"报名未开始"
@@ -49,11 +51,12 @@ public class PuCampus {
     static String cookie = null;
     static boolean Activity2 = false;
     static long timestampStartTime = 0;
-    static final SimpleDateFormat ScheduleFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     static AtomicInteger ai = new AtomicInteger(0);
     static AtomicInteger CheckLogin = new AtomicInteger(0);
+
     /**
      * 获得配置文件
+     *
      * @param keyWord 配置项
      * @return 配置项
      */
@@ -64,11 +67,7 @@ public class PuCampus {
         InputStream in2 = null;
         //尝试获取绝对文件路径
         String jarWholePath = PuCampus.class.getProtectionDomain().getCodeSource().getLocation().getFile();
-        try {
-            jarWholePath = java.net.URLDecoder.decode(jarWholePath, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            System.out.println(e.toString());
-        }
+        jarWholePath = java.net.URLDecoder.decode(jarWholePath, StandardCharsets.UTF_8);
         String jarPath = new File(jarWholePath).getParentFile().getAbsolutePath();
         //找到配置文件的相对路径
 
@@ -100,6 +99,7 @@ public class PuCampus {
         }
         return value;
     }
+
     /**
      * 同步系统时间
      * 时间服务器：ntp.aliyun.com
@@ -141,6 +141,7 @@ public class PuCampus {
             e.printStackTrace();
         }
     }
+
     /**
      * 扫码登陆，二维码文件保存在运行目录
      * 获取cookie
@@ -158,12 +159,13 @@ public class PuCampus {
         }
         logger.info("扫码登陆结束，进程开始！");
     }
+
     /**
      * 解析cookie内容
      */
-    private static String extractCookieValue(String cookieHeader, String cookieName) {
+    private static String extractCookieValue(String cookieHeader) {
         if (cookieHeader != null) {
-            String regex = cookieName + "=([^;]+)";
+            String regex = "TS_LOGGED_USER" + "=([^;]+)";
             Pattern pattern = Pattern.compile(regex);
             Matcher matcher = pattern.matcher(cookieHeader);
             if (matcher.find()) {
@@ -172,6 +174,7 @@ public class PuCampus {
         }
         return null;
     }
+
     /**
      * 使用账号密码自动登录
      * 获取cookie中的PhpSsid TS_LOGGED_USER
@@ -267,41 +270,26 @@ public class PuCampus {
         String setCookieHeader = response2.getHeaders().getFirst("Set-Cookie");
 
         // 使用正则表达式提取ts_logged_user的值
-        loggedUser = extractCookieValue(setCookieHeader, "TS_LOGGED_USER");
+        loggedUser = extractCookieValue(setCookieHeader);
 
         try {
             //System.out.println(decodeUni(response2.getBody()));
             if (loggedUser == null) {
                 logger.error("loggedUser获取错误");
                 System.exit(0);
-            }
-            else {
+            } else {
                 loggedUser = "TS_LOGGED_USER=" + loggedUser + "; ";
             }
-            if (TS_oauth_token == null || TS_oauth_token_secret == null){
+            if (TS_oauth_token == null || TS_oauth_token_secret == null) {
                 logger.error("cookies获取错误");
                 System.exit(0);
-            }
-            else {
+            } else {
                 cookie = loggedUser + "TS_oauth_token=" + TS_oauth_token + "; TS_oauth_token_secret=" + TS_oauth_token_secret + "; TS_think_language=zh-CN";
             }
         } catch (Exception ignored) {
             logger.error("登录出现异常 已结束 可能网站登录错误或发生变动 ");
             System.exit(0);
         }
-    }
-    /**
-     * unicode转换成中文 工具类
-     *
-     * @param respBody 返回body
-     */
-    public static String decodeUni(String respBody) {
-        Matcher m = Pattern.compile("\\\\u([0-9a-zA-Z]{4})").matcher(respBody);
-        StringBuffer sb = new StringBuffer(respBody.length());
-        while (m.find()) {
-            sb.append((char) Integer.parseInt(m.group(1), 16));
-        }
-        return sb.toString();
     }
 
     public static String autoGetActivityName() throws Exception {
@@ -338,13 +326,14 @@ public class PuCampus {
         logger.debug("Selected id:" + activityID);
         logger.debug("Selected id2:" + activityID_2);
     }
+
     /**
      * 获得活动名字 非关键
      *
      * @param id 活动id
      * @throws Exception e
      */
-    public static void getActivityName(int id) throws Exception {
+    public static void getActivityName(long id) throws Exception {
         HttpResponse<String> response3 =
                 Unirest.get("https://pocketuni.net/index.php?app=event&mod=Front&act=index&id=" + id)
                         .header("Host", "pocketuni.net")
@@ -373,13 +362,14 @@ public class PuCampus {
             System.exit(0);
         }
     }
+
     /**
      * 获取hash值和当前状态
      * 同时可以判断是否登录成功
      *
      * @throws Exception e
      */
-    public static void getHashStatus(int id) throws Exception {
+    public static void getHashStatus(long id) throws Exception {
         Element body = null;
         try {
             HttpResponse<String> response4 =
@@ -409,7 +399,7 @@ public class PuCampus {
             try {
                 respText = body.getElementsByClass("b").text();
                 hash = body.getElementsByAttributeValue("name", "__hash__").get(0).attr("value");
-                System.out.println(respText);
+                System.out.println("活动ID:" + id + "\t" + respText);
                 CheckLogin.incrementAndGet();
                 if (CheckLogin.get() > 2 && respText.contains("成功")) {
                     Thread.yield();
@@ -447,6 +437,7 @@ public class PuCampus {
             System.exit(0);
         }
     }
+
     /**
      * 延时启动  验证密码和 cookies 准备启动
      *
@@ -459,11 +450,11 @@ public class PuCampus {
         logger.info(cookie);
         logger.info("登录成功 准备启动");
         timestampStartTime = ScheduleFormat.parse(getSetting("StartTime")).getTime();
-        if(ifAutoSearch){
+        if (ifAutoSearch) {
             autoselect();
         }
         //输出信息
-        System.out.println("-".repeat(20) +" 活动详细信息 " + "-".repeat(20) + "\n第一个活动id:" + activityID);
+        System.out.println("-".repeat(20) + " 活动详细信息 " + "-".repeat(20) + "\n第一个活动id:" + activityID);
         getHashStatus(activityID);
         getActivityName(activityID);
         //判断有几个活动
@@ -492,12 +483,12 @@ public class PuCampus {
             }
         }
         System.out.println("--------------------START--------------------\n");
-        Thread.sleep(50);
     }
+
     /**
      * 尝试并发请求
      */
-    public static void tryOnce(int id) {
+    public static void tryOnce(long id) {
         try {
             Unirest.post("https://pocketuni.net/index.php?app=event&mod=Front&act=doAddUser&id=" + id)
                     .header("Host", "pocketuni.net")
@@ -521,7 +512,7 @@ public class PuCampus {
         EnvironmentChecker.checkJava();
         try {
             String latestVersion = GetHwid.getLatestVersion();
-            String currentVersion = "2.0-fix_1";
+            String currentVersion = "2.0.1";
             //检查新版本
             if (latestVersion != null && latestVersion.compareTo(currentVersion) > 0) {
                 logger.warn("发现新版本：" + latestVersion + " ,请尽快更新最新版本");
@@ -558,7 +549,7 @@ public class PuCampus {
                         tryOnce(activityID_2);
                     }
                     int checkFrequency = 2;
-                    if (currentIteration.incrementAndGet() %checkFrequency == 0) {
+                    if (currentIteration.incrementAndGet() % checkFrequency == 0) {
                         if (!Activity2) {
                             getHashStatus(activityID);
                         } else {
@@ -575,11 +566,9 @@ public class PuCampus {
             });
         }
 
-        // 关闭线程池
         executor.shutdown();
         executor.awaitTermination(1000L, TimeUnit.SECONDS);
         System.out.println("---Done---");
-
         long t2 = System.currentTimeMillis();
         Calendar c = Calendar.getInstance();
         //统计运算时间
