@@ -5,22 +5,19 @@ import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.json.JSONObject;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.*;
-import java.util.Base64;
-import java.util.Calendar;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.Map;
 
 public class PuCampus {
     static final SimpleDateFormat ScheduleFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -28,6 +25,10 @@ public class PuCampus {
     static String defaultSettingsFile = "src/main/resources/setting.properties";
     static String Accept = getSetting("Accept");
     static String UserAgent = getSetting("User-Agent");
+    static Boolean usepass = Boolean.parseBoolean(getSetting("usepass"));
+    static String email = getSetting("email");
+    static String username = getSetting("username");
+    static String passwd = getSetting("passwd");
     static String myLocalCookies = getSetting("myCookies");
     static long activityID = Long.parseLong((getSetting("activityID_1")));
     static long activityID_2 = Long.parseLong(getSetting("activityID_2"));
@@ -167,7 +168,44 @@ public class PuCampus {
     }
 
     /**
-     * 使用账号密码自动登录
+     * 解码base64
+     * @param base64Image base64编码
+     * @return 格式化后编码
+     */
+    public static byte[] decodeBase64Image(String base64Image) {
+        // 将"data:image/png;base64,"等前缀删除
+        String imageDataBytes = base64Image.substring(base64Image.indexOf(",") + 1);
+        return Base64.getDecoder().decode(imageDataBytes);
+    }
+
+    /**
+     * 图片写入文件
+     * @param imageBytes 字节流图片
+     * @param filePath 文件路径
+     */
+    public static void writeImageToFile(byte[] imageBytes, String filePath) {
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            fos.write(imageBytes);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 构造随机boundary
+     * @return boundary
+     */
+    public static String generateBoundary() {
+        SecureRandom random = new SecureRandom();
+        byte[] boundaryBytes = new byte[32];
+        random.nextBytes(boundaryBytes);
+
+        // 将生成的随机字节数组转换为Base64编码字符串
+        return Base64.getEncoder().encodeToString(boundaryBytes);
+    }
+
+    /**
+     * 使用账号密码或二维码自动登录
      * 获取cookie中的PhpSsid TS_LOGGED_USER
      * @throws Exception e
      */
@@ -177,144 +215,172 @@ public class PuCampus {
             logger.info("已经手动设置Cookies绕过自动登录");
             return;
         }
-        HttpResponse<String> response1 = Unirest.post("https://pocketuni.net/index.php?app=api&mod=Sitelist&act=loginQrcode")
-                .header("Host", "pocketuni.net")
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0")
-                .header("Accept", "application/json, text/plain, */*")
-                .header("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2")
-                .header("Accept-Encoding", "gzip, deflate")
-                .header("Origin", "https://pc.pocketuni.net")
-                .header("Referer", "https://pc.pocketuni.net/")
-                .header("Sec-Fetch-Dest", "empty")
-                .header("Sec-Fetch-Mode", "cors")
-                .header("Sec-Fetch-Site", "same-site")
-                .header("Te", "trailers")
-                .header("Connection", "close")
-                .asString();
+        if (usepass){
+            String boundary = generateBoundary();
+            // 构建请求体
+            String requestBody = "--" + boundary + "\r\n" +
+                    "Content-Disposition: form-data; name=\"email\"\r\n\r\n" +
+                    username + email + "\r\n" +
+                    "--" + boundary + "\r\n" +
+                    "Content-Disposition: form-data; name=\"type\"\r\n\r\n" +
+                    "pc\r\n" +
+                    "--" + boundary + "\r\n" +
+                    "Content-Disposition: form-data; name=\"password\"\r\n\r\n" +
+                    passwd + "\r\n" +
+                    "--" + boundary + "\r\n" +
+                    "Content-Disposition: form-data; name=\"usernum\"\r\n\r\n" +
+                    username + "\r\n" +
+                    "--" + boundary + "\r\n" +
+                    "Content-Disposition: form-data; name=\"sid\"\r\n\r\n\r\n" +
+                    "--" + boundary + "\r\n" +
+                    "Content-Disposition: form-data; name=\"school\"\r\n\r\n" +
+                    email + "\r\n" +
+                    "--" + boundary + "--";
 
-        int status = response1.getStatus();
-        String responseBody = response1.getBody();
 
-        //debug info
-        //logger.info("二维码HTTP响应状态码: " + status);
-        //logger.info("二维码HTTP响应内容:" + responseBody);
+            HttpResponse<String> response = Unirest.post("https://pocketuni.net/index.php?app=api&mod=Sitelist&act=login")
+                    .header("Cookie", "TS_think_language=zh-CN;")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0")
+                    .header("Accept", "application/json, text/plain, */*")
+                    .header("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2")
+                    .header("Accept-Encoding", "gzip, deflate")
+                    .header("Origin", "https://pc.pocketuni.net")
+                    .header("Referer", "https://pc.pocketuni.net/")
+                    .header("Sec-Fetch-Dest", "empty")
+                    .header("Sec-Fetch-Mode", "cors")
+                    .header("Sec-Fetch-Site", "same-site")
+                    .header("Te", "trailers")
+                    .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                    .body(requestBody)
+                    .asString();
 
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode jsonNode = objectMapper.readTree(responseBody);
+            try {
+                //System.out.println(response.getHeaders());
 
-        // 提取token及QRCode
-        String token = jsonNode.path("content").path("token").asText();
-        String dataUrl = jsonNode.path("content").path("dataUrl").asText().replace("\\", "").replace("data:image/png;base64,", "");
+                List<String> cookies = response.getHeaders().get("Set-Cookie");
+                JSONObject jsonObject = new JSONObject(response.getBody());
 
-        //debug info
-        //logger.info("Token值: " + token);
-        //logger.info("dataurl: " + dataUrl);
+                JSONObject content = jsonObject.getJSONObject("content");
 
-        byte[] imageBytes = Base64.getDecoder().decode(dataUrl);
+                String oauthToken = content.getString("oauth_token");
+                String oauthTokenSecret = content.getString("oauth_token_secret");
 
-        // 创建BufferedImage对象
-        ByteArrayInputStream bis = new ByteArrayInputStream(imageBytes);
-        BufferedImage bufferedImage = ImageIO.read(bis);
-
-        // 保存图片到运行目录
-        File outputFile = new File("output.png");
-        ImageIO.write(bufferedImage, "png", outputFile);
-        QRTime();
-        HttpResponse<String> response2 = Unirest.post("https://pocketuni.net/index.php?app=api&mod=Sitelist&act=pollingLogin&0")
-                .header("Host", "pocketuni.net")
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0")
-                .header("Accept", "application/json, text/plain, */*")
-                .header("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2")
-                .header("Accept-Encoding", "gzip, deflate")
-                .header("Content-Type", "multipart/form-data; boundary=---------------------------196999009720122279474182198307")
-                .header("Origin", "https://pc.pocketuni.net")
-                .header("Referer", "https://pc.pocketuni.net/")
-                .header("Sec-Fetch-Dest", "empty")
-                .header("Sec-Fetch-Mode", "cors")
-                .header("Sec-Fetch-Site", "same-site")
-                .header("Te", "trailers")
-                .header("Connection", "close")
-                .body("-----------------------------196999009720122279474182198307\r\n" +
-                        "Content-Disposition: form-data; name=\"token\"\r\n\r\n" +
-                        token + "\r\n" +
-                        "-----------------------------196999009720122279474182198307--")
-                .asString();
-
-        int status2 = response2.getStatus();
-        String responseBody2 = response2.getBody();
-
-        JsonNode jsonNode1 = objectMapper.readTree(responseBody2);
-        //提取cookie
-        String TS_oauth_token = jsonNode1.path("content").path("oauth_token").asText();
-        String TS_oauth_token_secret = jsonNode1.path("content").path("oauth_token_secret").asText();
-
-        //debug info
-        //logger.info("登陆界面HTTP响应状态码: " + status2);
-        //logger.info("登陆界面HTTP响应内容:" + responseBody2);
-        //response2.getHeaders().forEach((name, values) -> {
-        //System.out.println(name + ": " + values);
-        //});
-        //logger.info("响应头:" + response2.getHeaders());
-
-        // 获取Set-Cookie头
-        String setCookieHeader = response2.getHeaders().getFirst("Set-Cookie");
-
-        // 使用正则表达式提取ts_logged_user的值
-        loggedUser = extractCookieValue(setCookieHeader);
-
-        try {
-            //System.out.println(decodeUni(response2.getBody()));
-            if (loggedUser == null) {
-                logger.error("loggedUser获取错误");
+                String TS_LOGGED_USER = null;
+                for (String cookie : cookies) {
+                    if (cookie.contains("TS_LOGGED_USER")) {
+                        TS_LOGGED_USER = cookie.split(";")[0].split("=")[1];
+                    }
+                }
+                //System.out.println("TS_LOGGED_USER: " + TS_LOGGED_USER);
+                //System.out.println("TS_oauth_token: " + oauthToken);
+                //System.out.println("TS_oauth_token_secret: " + oauthTokenSecret);
+                cookie = "TS_LOGGED_USER=" + TS_LOGGED_USER + "; TS_oauth_token=" + oauthToken + "; TS_oauth_token_secret=" + oauthTokenSecret + "; TS_think_language=zh-CN;";
+            }catch (Exception ignored) {
+                logger.error("登录出现异常 已结束 可能网站登录错误或发生变动 ");
                 System.exit(0);
-            } else {
-                loggedUser = "TS_LOGGED_USER=" + loggedUser + "; ";
             }
-            if (TS_oauth_token == null || TS_oauth_token_secret == null) {
-                logger.error("cookies获取错误");
+
+        } else {
+            HttpResponse<String> response1 = Unirest.post("https://pocketuni.net/index.php?app=api&mod=Sitelist&act=loginQrcode")
+                    .header("Host", "pocketuni.net")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0")
+                    .header("Accept", "application/json, text/plain, */*")
+                    .header("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2")
+                    .header("Accept-Encoding", "gzip, deflate")
+                    .header("Origin", "https://pc.pocketuni.net")
+                    .header("Referer", "https://pc.pocketuni.net/")
+                    .header("Sec-Fetch-Dest", "empty")
+                    .header("Sec-Fetch-Mode", "cors")
+                    .header("Sec-Fetch-Site", "same-site")
+                    .header("Te", "trailers")
+                    .header("Connection", "close")
+                    .asString();
+
+            int status = response1.getStatus();
+            String responseBody = response1.getBody();
+
+            //debug info
+            //logger.info("二维码HTTP响应状态码: " + status);
+            //logger.info("二维码HTTP响应内容:" + responseBody);
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode jsonNode = objectMapper.readTree(responseBody);
+
+            // 提取token及QRCode
+            String token = jsonNode.path("content").path("token").asText();
+            String dataUrl = jsonNode.path("content").path("dataUrl").asText().replace("\\", "");
+
+            //debug info
+            //logger.info("Token值: " + token);
+            //logger.info("dataurl: " + dataUrl);
+
+            byte[] imageBytes = decodeBase64Image(dataUrl);
+
+            String filePath = "output.png"; // 图像文件路径，这里假设是png格式
+            writeImageToFile(imageBytes, filePath);
+            QRTime();
+            HttpResponse<String> response2 = Unirest.post("https://pocketuni.net/index.php?app=api&mod=Sitelist&act=pollingLogin&0")
+                    .header("Host", "pocketuni.net")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0")
+                    .header("Accept", "application/json, text/plain, */*")
+                    .header("Accept-Language", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2")
+                    .header("Accept-Encoding", "gzip, deflate")
+                    .header("Content-Type", "multipart/form-data; boundary=---------------------------196999009720122279474182198307")
+                    .header("Origin", "https://pc.pocketuni.net")
+                    .header("Referer", "https://pc.pocketuni.net/")
+                    .header("Sec-Fetch-Dest", "empty")
+                    .header("Sec-Fetch-Mode", "cors")
+                    .header("Sec-Fetch-Site", "same-site")
+                    .header("Te", "trailers")
+                    .header("Connection", "close")
+                    .body("-----------------------------196999009720122279474182198307\r\n" +
+                            "Content-Disposition: form-data; name=\"token\"\r\n\r\n" +
+                            token + "\r\n" +
+                            "-----------------------------196999009720122279474182198307--")
+                    .asString();
+
+            int status2 = response2.getStatus();
+            String responseBody2 = response2.getBody();
+
+            JsonNode jsonNode1 = objectMapper.readTree(responseBody2);
+            //提取cookie
+            String TS_oauth_token = jsonNode1.path("content").path("oauth_token").asText();
+            String TS_oauth_token_secret = jsonNode1.path("content").path("oauth_token_secret").asText();
+
+            //debug info
+            //logger.info("登陆界面HTTP响应状态码: " + status2);
+            //logger.info("登陆界面HTTP响应内容:" + responseBody2);
+            //response2.getHeaders().forEach((name, values) -> {
+            //System.out.println(name + ": " + values);
+            //});
+            //logger.info("响应头:" + response2.getHeaders());
+
+            // 获取Set-Cookie头
+            String setCookieHeader = response2.getHeaders().getFirst("Set-Cookie");
+
+            // 使用正则表达式提取ts_logged_user的值
+            loggedUser = extractCookieValue(setCookieHeader);
+
+            try {
+                //System.out.println(decodeUni(response2.getBody()));
+                if (loggedUser == null) {
+                    logger.error("loggedUser获取错误");
+                    System.exit(0);
+                } else {
+                    loggedUser = "TS_LOGGED_USER=" + loggedUser + "; ";
+                }
+                if (TS_oauth_token == null || TS_oauth_token_secret == null) {
+                    logger.error("cookies获取错误");
+                    System.exit(0);
+                } else {
+                    cookie = loggedUser + "TS_oauth_token=" + TS_oauth_token + "; TS_oauth_token_secret=" + TS_oauth_token_secret + "; TS_think_language=zh-CN";
+                }
+            } catch (Exception ignored) {
+                logger.error("登录出现异常 已结束 可能网站登录错误或发生变动 ");
                 System.exit(0);
-            } else {
-                cookie = loggedUser + "TS_oauth_token=" + TS_oauth_token + "; TS_oauth_token_secret=" + TS_oauth_token_secret + "; TS_think_language=zh-CN";
             }
-        } catch (Exception ignored) {
-            logger.error("登录出现异常 已结束 可能网站登录错误或发生变动 ");
-            System.exit(0);
         }
-    }
 
-    public static String autoGetActivityName() throws Exception {
-        HttpResponse<String> autoresponse =
-                Unirest.get("https://pocketuni.net/index.php?app=event&mod=School&act=board&titkey=%E5%85%AC%E7%9B%8A%E5%8A%B3%E5%8A%A8%E4%B9%8B%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%B7%A5%E7%A8%8B%E5%AD%A6%E9%99%A2")
-                        .header("Host", "pocketuni.net")
-                        .header("Connection", "keep-alive")
-                        .header("Cache-Control", "no-cache")
-                        .header("Upgrade-Insecure-Requests", "1")
-                        .header("User-Agent", UserAgent)
-                        .header("Accept", Accept)
-                        .header("Accept-Encoding", "gzip, deflate")
-                        .header("Accept-Language", "zh-CN,zh;q=0.9")
-                        .header("Cookie", cookie)
-                        .asString();
-        return autoresponse.getBody();
-    }
-
-
-    public static void autoselect() throws Exception {
-        String htmlContent = autoGetActivityName();
-        Map<String, String> titleAndTimeMap = AutoSelectActivity.extractTitleAndTime(htmlContent);
-
-        // 打印提取的 hd_c_left_title 和 hd_c_left_time 对
-        logger.debug("ActivityID and Time:");
-        for (Map.Entry<String, String> entry : titleAndTimeMap.entrySet()) {
-            logger.debug("ID: " + entry.getKey() + ", Start Time: " + entry.getValue());
-        }
-        AutoSelectActivity.compareDates(titleAndTimeMap);
-        activityID = AutoSelectActivity.activityid;
-        activityID_2 = AutoSelectActivity.activityid2;
-
-        timestampStartTime = AutoSelectActivity.timestampStartTime;
-        logger.debug("Selected id:" + activityID);
-        logger.debug("Selected id2:" + activityID_2);
     }
 
     /**
@@ -358,7 +424,7 @@ public class PuCampus {
      *
      * @throws Exception e
      */
-    public static void getHashStatus(long id) throws Exception {
+    public static boolean getHashStatus(long id) throws Exception {
         Element body = null;
         try {
             HttpResponse<String> response4 =
@@ -380,54 +446,29 @@ public class PuCampus {
                             .header("Cookie", cookie)
                             .asString();
             body = Jsoup.parseBodyFragment(response4.getBody());
-        } catch (Exception e) {
-            logger.error("网页有改动,如可以正常报名成功就忽略");
-            return;
-        }
-        if (CheckLogin.get() > 0) {
             try {
                 respText = body.getElementsByClass("b").text();
                 hash = body.getElementsByAttributeValue("name", "__hash__").get(0).attr("value");
                 System.out.println("活动ID:" + id + "\t" + respText);
-                CheckLogin.incrementAndGet();
-                if (respText.contains("成功")) {
+                if (respText.contains("成功") || respText.contains("已满") || respText.contains("结束")) {
                     Thread.yield();
                     System.out.println("---Done---");
                     long t2 = System.currentTimeMillis();
                     Calendar c = Calendar.getInstance();
                     //统计运算时间
                     c.setTimeInMillis(t2 - t1);
-                    System.out.println("耗时: " + c.get(Calendar.MINUTE) + "分 "
+                    String msg = ("耗时: " + c.get(Calendar.MINUTE) + "分 "
                             + c.get(Calendar.SECOND) + "秒 " + c.get(Calendar.MILLISECOND) + " 微秒");
-                    System.exit(0);
-                }else if (respText.contains("已满")||respText.contains("结束")) {
-                    return;
+                    System.out.println(msg);
+                    return true;
                 }
             } catch (Exception ignored) {
-                return;
+                return false;
             }
-            return;
+        } catch (Exception e) {
+            return false;
         }
-        //初次使用此函数需要验证登录
-        try {
-            respText = body.text();
-            //检查HTML段
-            if (respText.contains("活动不存在")) {
-                System.out.println("活动不存在 ");
-                System.exit(0);
-            }
-            hash = body.getElementsByAttributeValue("name", "__hash__").get(0).attr("value");
-            StatusStr = body.getElementsByClass("b").text();
-            CheckLogin.incrementAndGet();
-        } catch (Exception ignored) {
-            System.out.println("登录失败");
-            if (useLocalCookies) {
-                System.out.println("手动输入了错误或过时的Cookies:" + cookie);
-            } else {
-                System.out.println("学校代码错误");
-            }
-            System.exit(0);
-        }
+        return false;
     }
 
     /**
@@ -442,7 +483,7 @@ public class PuCampus {
         logger.info("登录成功 准备启动");
         timestampStartTime = ScheduleFormat.parse(getSetting("StartTime")).getTime();
         if (ifAutoSearch) {
-            autoselect();
+            AutoSelectActivity.autoSelect();
         }
         //输出信息
         System.out.println("-".repeat(20) + " 活动详细信息 " + "-".repeat(20) + "\n活动id:" + activityID);
@@ -510,15 +551,10 @@ public class PuCampus {
     /**
      * 活动报名及状态检查任务逻辑
      * @param activityID 活动id
-     * @param taskCounter 循环检查次数
      */
-    private static void executeTask(long activityID, AtomicInteger taskCounter) {
+    private static void executeTask(long activityID) {
         try {
-            taskCounter.getAndIncrement();
             tryOnce(activityID);
-            if (taskCounter.get() % 2 == 0) {
-                getHashStatus(activityID);
-            }
         } catch (Exception ignored) {
         }
     }
@@ -528,7 +564,7 @@ public class PuCampus {
 
         try {
             String latestVersion = GetHwid.getLatestVersion();
-            String currentVersion = "2.0.1";
+            String currentVersion = "2.1.0";
             // 检查新版本
             if (latestVersion != null && latestVersion.compareTo(currentVersion) > 0) {
                 logger.warn("新版本可用: " + latestVersion + ", 请尽快更新到新版本.");
@@ -550,19 +586,21 @@ public class PuCampus {
         ExecutorService executor2 = createThreadPool();
 
         t1 = System.currentTimeMillis();
-        AtomicInteger taskCounter = new AtomicInteger();
 
         // 创建任务
         for (int i = 0; i < taskMAX; i++) {
-            executor1.execute(() -> executeTask(activityID, taskCounter));
-            if (Activity2) {
-                executor2.execute(() -> executeTask(activityID_2, taskCounter));
+            if (!executor1.isShutdown()) {
+                executor1.execute(() -> executeTask(activityID));
+                if (getHashStatus(activityID)) {
+                    executor1.shutdownNow();
+                }
+            }
+            if (Activity2 && !executor2.isShutdown()) {
+                executor2.execute(() -> executeTask(activityID_2));
+                if (getHashStatus(activityID_2)) {
+                    executor2.shutdownNow();
+                }
             }
         }
-
-        executor1.shutdown();
-        executor1.awaitTermination(1000L, TimeUnit.SECONDS);
-        executor2.shutdown();
-        executor2.awaitTermination(1000L, TimeUnit.SECONDS);
     }
 }

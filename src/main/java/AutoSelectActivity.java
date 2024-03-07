@@ -1,3 +1,5 @@
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jsoup.Jsoup;
@@ -17,6 +19,9 @@ public class AutoSelectActivity {
 
     static long activityid = 0;
     static long activityid2 = 0;
+    static String Accept = PuCampus.Accept;
+    static String UserAgent = PuCampus.UserAgent;
+    static String cookie = PuCampus.cookie;
     static String selectedStartTime = null;
     static long timestampStartTime = 0;
     private static final Logger logger = LogManager.getLogger(AutoSelectActivity.class);
@@ -139,5 +144,48 @@ public class AutoSelectActivity {
             System.exit(0);
         }
 
+    }
+
+    /**
+     * 获取活动关键字“公益劳动之计算机工程学院”
+     * @return 响应体
+     * @throws Exception 网络异常
+     */
+    public static String autoGetActivityName() throws Exception {
+        HttpResponse<String> autoresponse =
+                Unirest.get("https://pocketuni.net/index.php?app=event&mod=School&act=board&titkey=%E5%85%AC%E7%9B%8A%E5%8A%B3%E5%8A%A8%E4%B9%8B%E8%AE%A1%E7%AE%97%E6%9C%BA%E5%B7%A5%E7%A8%8B%E5%AD%A6%E9%99%A2")
+                        .header("Host", "pocketuni.net")
+                        .header("Connection", "keep-alive")
+                        .header("Cache-Control", "no-cache")
+                        .header("Upgrade-Insecure-Requests", "1")
+                        .header("User-Agent", UserAgent)
+                        .header("Accept", Accept)
+                        .header("Accept-Encoding", "gzip, deflate")
+                        .header("Accept-Language", "zh-CN,zh;q=0.9")
+                        .header("Cookie", cookie)
+                        .asString();
+        return autoresponse.getBody();
+    }
+
+    /**
+     * 自动选择对应活动
+     * @throws Exception 网络异常
+     */
+    public static void autoSelect() throws Exception {
+        String htmlContent = autoGetActivityName();
+        Map<String, String> titleAndTimeMap = extractTitleAndTime(htmlContent);
+
+        // 打印提取的 hd_c_left_title 和 hd_c_left_time 对
+        logger.debug("ActivityID and Time:");
+        for (Map.Entry<String, String> entry : titleAndTimeMap.entrySet()) {
+            logger.debug("ID: " + entry.getKey() + ", Start Time: " + entry.getValue());
+        }
+        compareDates(titleAndTimeMap);
+        PuCampus.activityID = activityid;
+        PuCampus.activityID_2 = activityid2;
+
+        PuCampus.timestampStartTime = timestampStartTime;
+        logger.debug("Selected 1st id:" + PuCampus.activityID);
+        logger.debug("Selected 2nd id:" + PuCampus.activityID_2);
     }
 }
